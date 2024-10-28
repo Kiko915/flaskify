@@ -1,0 +1,36 @@
+.step {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #ddd;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: bold;
+    color: #666;
+  }
+  
+  .step.active {
+    background-color: #062a51;
+    color: white;
+  }
+  
+  .line {
+    width: 50px;
+    height: 4px;
+    background-color: #ddd;
+    margin: 0 10px;
+  }
+  
+  .flex {
+    display: flex;
+  }
+  
+  .justify-center {
+    justify-content: center;
+  }
+  
+  .items-center {
+    align-items: center;
+  }
+  
