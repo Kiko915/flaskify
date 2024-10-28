@@ -8,6 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import uuid
 from flask_login import UserMixin
+from sqlalchemy.orm import validates
 
 
 db = SQLAlchemy()
@@ -49,6 +50,36 @@ class Users(db.Model, UserMixin):
         result = check_password_hash(self.password_hash, password)
         print(f"Password check for {self.email}: {result}")  # Debug output
         return result
+    
+    # New address-related methods
+    def get_active_address(self):
+        """Get the user's currently active address"""
+        return Address.query.filter_by(user_uuid=self.user_uuid, is_active=True).first()
+    
+    def get_default_shipping_address(self):
+        """Get the user's default shipping address"""
+        return Address.query.filter_by(user_uuid=self.user_uuid, is_default_shipping=True).first()
+    
+    def get_default_billing_address(self):
+        """Get the user's default billing address"""
+        return Address.query.filter_by(user_uuid=self.user_uuid, is_default_billing=True).first()
+    
+    def set_active_address(self, address_uuid):
+        """Set an address as active and deactivate others"""
+        # Deactivate all addresses for this user
+        Address.query.filter_by(user_uuid=self.user_uuid).update({Address.is_active: False})
+        
+        # Set the specified address as active
+        address = Address.query.filter_by(
+            user_uuid=self.user_uuid,
+            address_uuid=address_uuid
+        ).first()
+        
+        if address:
+            address.is_active = True
+            db.session.commit()
+            return True
+        return False
 
     def __repr__(self):
         return f'<User {self.first_name} {self.last_name}>'
@@ -74,6 +105,74 @@ class PhoneVerification(db.Model):
         self.phone_number = phone_number
         self.verification_code = verification_code
         self.expires_at = datetime.now() + timedelta(minutes=10)
+
+class Address(db.Model):
+    __tablename__ = 'addresses'
+    
+    address_uuid = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_uuid = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), nullable=False)
+    
+    # Address details
+    address_name = db.Column(db.String(100), nullable=False)
+    recipient_name = db.Column(db.String(255), nullable=False)
+    phone_number = db.Column(db.String(20), nullable=False)
+    country = db.Column(db.String(100), nullable=False)
+    province = db.Column(db.String(100), nullable=False)
+    city = db.Column(db.String(100), nullable=False)
+    postal_code = db.Column(db.String(20), nullable=False)
+    complete_address = db.Column(db.String(255), nullable=False)
+    additional_info = db.Column(db.String(255))
+    
+    # Status flags
+    is_active = db.Column(db.Boolean, default=False)
+    is_default_shipping = db.Column(db.Boolean, default=False)
+    is_default_billing = db.Column(db.Boolean, default=False)
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+    
+    # Metadata
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationship
+    user = db.relationship('Users', backref=db.backref('addresses', lazy=True))
+
+    def soft_delete(self):
+        """Soft delete the address"""
+        if self.is_default_shipping or self.is_default_billing:
+            # Find another active address to set as default
+            alternative_address = Address.query.filter(
+                Address.user_uuid == self.user_uuid,
+                Address.address_uuid != self.address_uuid,
+                Address.is_deleted == False
+            ).first()
+            
+            if alternative_address:
+                alternative_address.is_default_shipping = self.is_default_shipping
+                alternative_address.is_default_billing = self.is_default_billing
+            
+        self.is_deleted = True
+        self.deleted_at = datetime.now()
+        self.is_active = False
+        self.is_default_shipping = False
+        self.is_default_billing = False
+        
+        db.session.commit()
+        return True
+
+    @validates('is_default_shipping', 'is_default_billing')
+    def validate_default_status(self, key, value):
+        """Ensure only one default address exists for shipping/billing"""
+        if value:
+            # Unset the default flag for all other addresses
+            Address.query.filter(
+                Address.user_uuid == self.user_uuid,
+                Address.address_uuid != self.address_uuid
+            ).update({key: False})
+        return value
+
+    def __repr__(self):
+        return f'<Address {self.address_name} for {self.recipient_name}>'
 
 
 def create_app():

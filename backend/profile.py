@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from datetime import datetime
-from __init__ import db, Users
+from __init__ import db, Users, Address
 import cloudinary.uploader
 
 
@@ -141,3 +141,269 @@ def upload_profile_image():
             return jsonify({'error': str(e)}), 500
     else:
         return jsonify({'error': 'Invalid file type'}), 400
+    
+
+
+@profile_bp.route('/api/addresses', methods=['POST'])
+@login_required
+def add_address():
+    data = request.json
+    
+    # Create new address
+    new_address = Address(
+        user_uuid=current_user.user_uuid,
+        address_name=data['address_name'],
+        recipient_name=data['recipient_name'],
+        phone_number=data['phone_number'],
+        country=data['country'],
+        province=data['province'],
+        city=data['city'],
+        postal_code=data['postal_code'],
+        complete_address=data['complete_address'],
+        additional_info=data.get('additional_info', '')
+    )
+    
+    # If this is the user's first address, make it active and default
+    existing_addresses = Address.query.filter_by(user_uuid=current_user.user_uuid).count()
+    if not existing_addresses:
+        new_address.is_active = True
+        new_address.is_default_shipping = True
+        new_address.is_default_billing = True
+    
+    db.session.add(new_address)
+    db.session.commit()
+    
+    return jsonify({
+        'message': 'Address added successfully',
+        'address_uuid': new_address.address_uuid
+    })
+
+@profile_bp.route('/api/addresses/<address_uuid>/set-active', methods=['POST'])
+@login_required
+def set_active_address(address_uuid):
+    if current_user.set_active_address(address_uuid):
+        return jsonify({'message': 'Active address updated successfully'})
+    return jsonify({'error': 'Address not found'}), 404
+
+
+@profile_bp.route('/api/addresses/<address_uuid>', methods=['DELETE'])
+@login_required
+def delete_address(address_uuid):
+    try:
+        # Find the address
+        address = Address.query.filter_by(
+            address_uuid=address_uuid,
+            user_uuid=current_user.user_uuid
+        ).first()
+        
+        if not address:
+            return jsonify({
+                'error': 'Address not found'
+            }), 404
+            
+        # Check if this is the user's only address
+        address_count = Address.query.filter_by(
+            user_uuid=current_user.user_uuid,
+            is_deleted=False
+        ).count()
+        
+        if address_count == 1:
+            return jsonify({
+                'error': 'Cannot delete the only address. Please add another address first.'
+            }), 400
+        
+        # Perform soft delete
+        address.soft_delete()
+        
+        return jsonify({
+            'message': 'Address deleted successfully',
+            'address_uuid': address_uuid
+        })
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Database error occurred',
+            'details': str(e)
+        }), 500
+
+
+@profile_bp.route('/api/addresses/<address_uuid>/hard-delete', methods=['DELETE'])
+@login_required
+def hard_delete_address(address_uuid):
+    try:
+        # Find the address
+        address = Address.query.filter_by(
+            address_uuid=address_uuid,
+            user_uuid=current_user.user_uuid
+        ).first()
+        
+        if not address:
+            return jsonify({
+                'error': 'Address not found'
+            }), 404
+            
+        # Check if this is the user's only address
+        address_count = Address.query.filter_by(
+            user_uuid=current_user.user_uuid,
+            is_deleted=False
+        ).count()
+        
+        if address_count == 1:
+            return jsonify({
+                'error': 'Cannot delete the only address. Please add another address first.'
+            }), 400
+        
+        # Perform hard delete
+        db.session.delete(address)
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Address permanently deleted',
+            'address_uuid': address_uuid
+        })
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Database error occurred',
+            'details': str(e)
+        }), 500
+
+# Optional: Endpoint to restore a soft-deleted address
+@profile_bp.route('/api/addresses/<address_uuid>/restore', methods=['POST'])
+@login_required
+def restore_address(address_uuid):
+    try:
+        address = Address.query.filter_by(
+            address_uuid=address_uuid,
+            user_uuid=current_user.user_uuid,
+            is_deleted=True
+        ).first()
+        
+        if not address:
+            return jsonify({
+                'error': 'Deleted address not found'
+            }), 404
+            
+        address.is_deleted = False
+        address.deleted_at = None
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Address restored successfully',
+            'address_uuid': address_uuid
+        })
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Database error occurred',
+            'details': str(e)
+        }), 500
+
+# Modified get addresses endpoint to include filter for deleted addresses
+@profile_bp.route('/api/addresses', methods=['GET'])
+@login_required
+def get_addresses():
+    # Get query parameter for including deleted addresses
+    include_deleted = request.args.get('include_deleted', 'false').lower() == 'true'
+    
+    # Build query
+    query = Address.query.filter_by(user_uuid=current_user.user_uuid)
+    if not include_deleted:
+        query = query.filter_by(is_deleted=False)
+        
+    addresses = query.all()
+    
+    return jsonify([{
+        'address_uuid': addr.address_uuid,
+        'address_name': addr.address_name,
+        'recipient_name': addr.recipient_name,
+        'phone_number': addr.phone_number,
+        'country': addr.country,
+        'province': addr.province,
+        'city': addr.city,
+        'postal_code': addr.postal_code,
+        'complete_address': addr.complete_address,
+        'additional_info': addr.additional_info,
+        'is_active': addr.is_active,
+        'is_default_shipping': addr.is_default_shipping,
+        'is_default_billing': addr.is_default_billing,
+        'is_deleted': addr.is_deleted,
+        'deleted_at': addr.deleted_at.isoformat() if addr.deleted_at else None,
+        'created_at': addr.created_at.isoformat(),
+        'updated_at': addr.updated_at.isoformat()
+    } for addr in addresses])
+
+
+@profile_bp.route('/api/addresses/<address_uuid>', methods=['PUT'])
+@login_required
+def update_address(address_uuid):
+    try:
+        # Find the address
+        address = Address.query.filter_by(
+            address_uuid=address_uuid,
+            user_uuid=current_user.user_uuid,
+            is_deleted=False
+        ).first()
+        
+        if not address:
+            return jsonify({
+                'error': 'Address not found'
+            }), 404
+            
+        # Get update data
+        data = request.json
+        
+        # Update fields if provided in request
+        if 'address_name' in data:
+            address.address_name = data['address_name']
+        if 'recipient_name' in data:
+            address.recipient_name = data['recipient_name']
+        if 'phone_number' in data:
+            address.phone_number = data['phone_number']
+        if 'country' in data:
+            address.country = data['country']
+        if 'province' in data:
+            address.province = data['province']
+        if 'city' in data:
+            address.city = data['city']
+        if 'postal_code' in data:
+            address.postal_code = data['postal_code']
+        if 'complete_address' in data:
+            address.complete_address = data['complete_address']
+        if 'additional_info' in data:
+            address.additional_info = data['additional_info']
+        if 'is_default_shipping' in data:
+            # If setting as default shipping, unset other addresses
+            if data['is_default_shipping']:
+                Address.query.filter_by(
+                    user_uuid=current_user.user_uuid,
+                    is_deleted=False,
+                    is_default_shipping=True
+                ).update({'is_default_shipping': False})
+            address.is_default_shipping = data['is_default_shipping']
+        if 'is_default_billing' in data:
+            # If setting as default billing, unset other addresses
+            if data['is_default_billing']:
+                Address.query.filter_by(
+                    user_uuid=current_user.user_uuid,
+                    is_deleted=False,
+                    is_default_billing=True
+                ).update({'is_default_billing': False})
+            address.is_default_billing = data['is_default_billing']
+            
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Address updated successfully',
+            'address_uuid': address_uuid
+        })
+        
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Database error occurred',
+            'details': str(e)
+        }), 500

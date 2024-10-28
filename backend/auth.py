@@ -1,22 +1,15 @@
 from flask import Blueprint, jsonify, request
-from __init__ import db, mail, OTP, Users, PhoneVerification
+from __init__ import db, mail, OTP, Users
 from flask_mail import Message
-from twilio.rest import Client
 import random
 import string
 from config import Config
 from datetime import datetime, timedelta
-from utils.auth_utils import format_phone
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 
 auth = Blueprint('auth', __name__)
 
-account_sid = Config.account_sid
-auth_token = Config.auth_token
-twilio_phone_number = Config.twilio_phone_number
-
-client = Client(account_sid, auth_token)
 
 @auth.route('/send_otp', methods=['POST'])
 def send_otp():
@@ -66,71 +59,6 @@ def verify_otp():
         return jsonify({'success': True, 'message': 'OTP verified'}), 200
 
     return jsonify({'success': False, 'message': 'Invalid OTP'}), 400
-
-
-# Send phone verification sms
-@auth.route('/send-verification-code', methods=['POST'])
-def send_verification_code():
-    data = request.json
-    phone_number = data.get('phone')
-    if not phone_number:
-        return jsonify({"error": "Phone number is required"}), 400
-
-    # Generate a 6-digit verification code
-    verification_code = str(random.randint(100000, 999999))
-    expiration_time = datetime.now() + timedelta(minutes=10)  # Expires in 10 minutes
-
-    # Save verification code and expiration time to the database
-    existing_record = PhoneVerification.query.filter_by(phone_number=phone_number).first()
-    if existing_record:
-        # Update the code and expiration time if a record exists
-        existing_record.verification_code = verification_code
-        existing_record.expires_at = expiration_time
-    else:
-        new_verification = PhoneVerification(phone_number=phone_number, verification_code=verification_code)
-        db.session.add(new_verification)
-    
-    db.session.commit()
-
-    # Use Twilio to send the SMS
-    try:
-        message = client.messages.create(
-            body=f"Your verification code is {verification_code}",
-            from_=format_phone(twilio_phone_number),
-            to=format_phone(phone_number)
-        )
-        return jsonify({"message": "Verification code sent successfully"}), 200
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-@auth.route('/verify-code', methods=['POST'])
-def verify_code():
-    data = request.json
-    phone_number = data.get('phone')
-    user_code = data.get('verificationCode')
-
-    if not phone_number or not user_code:
-        return jsonify({"error": "Phone number and verification code are required"}), 400
-
-    # Retrieve the stored verification code and expiration time from the database
-    verification_record = PhoneVerification.query.filter_by(phone_number=phone_number).first()
-
-    if verification_record:
-        # Clean up expired records
-        if datetime.now() > verification_record.expires_at:
-            db.session.delete(verification_record)
-            db.session.commit()
-            return jsonify({"error": "Verification code has expired"}), 400
-        
-        # Check if the code matches
-        if verification_record.verification_code == user_code:
-            return jsonify({"message": "Phone number verified successfully!"}), 200
-        else:
-            return jsonify({"error": "Invalid verification code"}), 400
-    else:
-        return jsonify({"error": "Phone number not found"}), 404
-
 
 
 @auth.route('/signup', methods=['POST'])

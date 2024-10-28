@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import Loader from './components/Loader';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import { Helmet } from 'react-helmet-async';
 
 const AppLayout = () => {
   const [loading, setLoading] = useState(false);
@@ -27,6 +28,9 @@ const AppLayout = () => {
   
   return (
     <div>
+      <Helmet>
+        <title>Flaskify | Tech powered marketplace.</title>
+      </Helmet>
       {/* Show header except for auth routes */}
       {!isAuthRoute && <Header />}
       
