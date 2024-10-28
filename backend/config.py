@@ -11,7 +11,7 @@ class Config:
     MAIL_SERVER = 'smtp.gmail.com'
     MAIL_PORT = 587
     MAIL_USE_TLS = True
-    MAIL_USERNAME = 'francismistica06@gmail.com'
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME')
     MAIL_PASSWORD = 'cqel hbun keid yidv'
     MAIL_USE_SSL = False
 
