@@ -15,11 +15,6 @@ class Config:
     MAIL_PASSWORD = 'cqel hbun keid yidv'
     MAIL_USE_SSL = False
 
-    # Twilio configuration
-    account_sid = 'AC0afab8bdaf61803f416c955a399afe4f'
-    auth_token = '31425bf65bf994ef4927cc35b7a3ad9e'
-    twilio_phone_number = '+1 706 685 6398'
-
     # Cloudinary configuration
     config(
         cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
