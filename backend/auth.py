@@ -7,9 +7,11 @@ from config import Config
 from datetime import datetime, timedelta
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from itsdangerous import SignatureExpired, URLSafeTimedSerializer
 
 auth = Blueprint('auth', __name__)
 
+serializer = URLSafeTimedSerializer(Config.SECRET_KEY)
 
 @auth.route('/send_otp', methods=['POST'])
 def send_otp():
@@ -128,6 +130,82 @@ def logout():
     return jsonify({'message': 'Logged out successfully!'}), 200
 
 # Reset password
+def send_reset_email(user_email, reset_url):
+    msg = Message('Password Reset Request',
+                sender='noreply@yourdomain.com',
+                recipients=[user_email])
+    msg.body = f'''To reset your password, visit the following link:
+{reset_url}
+
+If you did not make this request, please ignore this email.
+'''
+    mail.send(msg)
+
+
+@auth.route('/api/forgot-password', methods=['POST'])
+def forgot_password():
+    try:
+        data = request.get_json()
+        email = data.get('email')
+        
+        user = Users.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({'message': 'Email not found'}), 404
+        
+        # Generate token
+        token = serializer.dumps(email, salt='forgot-password-salt')
+        
+        # Store token and expiry
+        user.reset_token = token
+        user.reset_token_expiry = datetime.now() + timedelta(hours=1)
+        db.session.commit()
+        
+        # Create reset URL (change domain to match your frontend)
+        reset_url = f'http://localhost:5173/auth/reset-password/{token}'
+        
+        # Send email
+        send_reset_email(email, reset_url)
+        
+        return jsonify({'message': 'Password reset email sent'}), 200
+    
+    except Exception as e:
+        return jsonify({'message': 'Error processing request', 'error': str(e)}), 500
+
+
+@auth.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    try:
+        data = request.get_json()
+        token = data.get('token')
+        new_password = data.get('password')
+        
+        if not token or not new_password:
+            return jsonify({'message': 'Missing required fields'}), 400
+        
+        # Find user by token
+        user = Users.query.filter_by(reset_token=token).first()
+        if not user:
+            return jsonify({'message': 'Invalid or expired token'}), 400
+        
+        # Check token expiry
+        if user.reset_token_expiry < datetime.now():
+            user.reset_token = None
+            user.reset_token_expiry = None
+            db.session.commit()
+            return jsonify({'message': 'Token has expired'}), 400
+        
+        # Reset password
+        user.set_password(new_password)
+        user.reset_token = None
+        user.reset_token_expiry = None
+        db.session.commit()
+        
+        return jsonify({'message': 'Password reset successful'}), 200
+        
+    except SignatureExpired:
+        return jsonify({'message': 'Token has expired'}), 400
+    except Exception as e:
+        return jsonify({'message': 'Error processing request', 'error': str(e)}), 500
 
 
 # Protected route

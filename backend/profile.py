@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from datetime import datetime
-from __init__ import db, Users, Address
+from __init__ import db, Users, Address, PaymentMethod
 import cloudinary.uploader
 
 
@@ -407,3 +407,82 @@ def update_address(address_uuid):
             'error': 'Database error occurred',
             'details': str(e)
         }), 500
+    
+
+# PAYMENT METHODS
+@profile_bp.route('/api/payment-methods', methods=['GET', 'POST'])
+@login_required
+def payment_methods():
+    if request.method == 'POST':
+        data = request.get_json()
+        payment_type = data['payment_type']
+        payment_details = {}
+
+        # Handle different payment types
+        if payment_type == 'card':
+            card_number = data['card_number']
+            
+            # Validate Visa or Mastercard based on starting digits
+            if not (card_number.startswith('4') or 
+                    51 <= int(card_number[:2]) <= 55 or 
+                    2221 <= int(card_number[:4]) <= 2720):
+                return jsonify({'error': 'Only Visa and Mastercard are accepted'}), 400
+
+            payment_details = {
+                'card_number': card_number,
+                'expiry_date': data['expiry_date'],
+                'card_holder_name': data['card_holder_name'],
+                'cvv': data['cvv']
+            }
+        elif payment_type == 'paypal':
+            payment_details = {
+                'paypal_email': data['paypal_email']
+            }
+        elif payment_type == 'cod':
+            payment_details = {'description': 'Cash on Delivery'}
+        else:
+            return jsonify({'error': 'Unsupported payment type'}), 400
+
+        payment_method = PaymentMethod(
+            user_uuid=current_user.user_uuid,  # Use the current user's ID
+            payment_type=payment_type,
+            payment_details=payment_details,
+            is_default=data.get('is_default', False)
+        )
+        db.session.add(payment_method)
+        db.session.commit()
+        return jsonify(payment_method.to_dict()), 201
+    else:
+        payment_methods = PaymentMethod.query.filter_by(user_uuid=current_user.user_uuid).all()
+        return jsonify([pm.to_dict() for pm in payment_methods])
+    
+
+@profile_bp.route('/api/payment-methods/<int:id>/set-default', methods=['POST'])
+@login_required
+def set_default_payment_method(id):
+    # Fetch the payment method and check if it belongs to the current user
+    payment_method = PaymentMethod.query.get_or_404(id)
+    if payment_method.user_uuid != current_user.user_uuid:
+        return jsonify({'error': 'Unauthorized access'}), 403
+
+    # Unset all other default payment methods for the user
+    PaymentMethod.query.filter_by(user_uuid=current_user.user_uuid, is_default=True).update({'is_default': False})
+    payment_method.is_default = True
+    db.session.commit()
+
+    return jsonify(payment_method.to_dict()), 200
+
+
+@profile_bp.route('/api/payment-methods/<id>', methods=['DELETE'])
+@login_required
+def delete_payment_method(id):
+    # Fetch the payment method by ID and check if it belongs to the current user
+    payment_method = PaymentMethod.query.get_or_404(id)
+    if payment_method.user_uuid != current_user.user_uuid:
+        return jsonify({'error': 'Unauthorized access'}), 403
+
+    # Delete the payment method
+    db.session.delete(payment_method)
+    db.session.commit()
+    
+    return jsonify({'message': 'Payment method deleted'}), 204

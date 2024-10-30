@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import uuid
 from flask_login import UserMixin
 from sqlalchemy.orm import validates
+from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 
 
 db = SQLAlchemy()
@@ -35,6 +36,8 @@ class Users(db.Model, UserMixin):
     is_verified = db.Column(db.Boolean, default=False)
     date_of_birth = db.Column(db.Date, nullable=True)
     profile_image_url = db.Column(db.String(255), nullable=True)
+    reset_token = db.Column(db.String(100), unique=True)
+    reset_token_expiry = db.Column(db.DateTime)
 
     def get_id(self):
         return str(self.user_uuid)
@@ -42,7 +45,7 @@ class Users(db.Model, UserMixin):
     def set_password(self, password):
         password = password.strip()
         print(f"Password: {password}")  # Debug output
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = generate_password_hash(password, method='pbkdf2')
 
     def check_password(self, password):
         password = password.strip()
@@ -174,6 +177,33 @@ class Address(db.Model):
     def __repr__(self):
         return f'<Address {self.address_name} for {self.recipient_name}>'
 
+class PaymentMethod(db.Model):
+    __tablename__ = 'payment_methods'
+
+    payment_uuid = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_uuid = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), nullable=False)
+    payment_type = db.Column(db.String(50), nullable=False)  # 'card' or 'paypal'
+    payment_details = db.Column(db.JSON, nullable=False)  # Stores card details or PayPal account info
+    is_default = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.now)
+    updated_at = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+
+    user = db.relationship('Users', backref=db.backref('payment_methods', lazy='dynamic'))
+
+    def to_dict(self):
+        return {
+            'id': self.payment_uuid,
+            'user_id': self.user_uuid,
+            'payment_type': self.payment_type,
+            'payment_details': self.payment_details,  # Display sensitive info carefully
+            'is_default': self.is_default,
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
+
+    def __repr__(self):
+        return f'<PaymentMethod {self.id}>'
+    
 
 def create_app():
     app = Flask(__name__)

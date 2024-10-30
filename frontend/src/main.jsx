@@ -24,6 +24,8 @@ import Purchase from './pages/user/purchases/Purchase.jsx';
 import BanksCards from './pages/user/profile/BanksCards.jsx';
 import Addresses from './pages/user/profile/Addresses.jsx';
 import ChangePassword from './pages/user/profile/ChangePassword.jsx';
+import ForgotPassword from './pages/auth/ForgotPassword.jsx';
+import ResetPassword from './pages/auth/ResetPassword.jsx';
 
 const router = createBrowserRouter([
   {
@@ -42,6 +44,14 @@ const router = createBrowserRouter([
           {
             path: "/auth/login",
             element: <Login />
+          },
+          {
+            path: "/auth/forgot-password",
+            element: <ForgotPassword />
+          },
+          {
+            path: "/auth/reset-password/:token",
+            element: <ResetPassword />
           }
         ]
       },
