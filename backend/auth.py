@@ -130,18 +130,6 @@ def logout():
     return jsonify({'message': 'Logged out successfully!'}), 200
 
 # Reset password
-def send_reset_email(user_email, reset_url):
-    msg = Message('Password Reset Request',
-                sender='noreply@yourdomain.com',
-                recipients=[user_email])
-    msg.body = f'''To reset your password, visit the following link:
-{reset_url}
-
-If you did not make this request, please ignore this email.
-'''
-    mail.send(msg)
-
-
 @auth.route('/api/forgot-password', methods=['POST'])
 def forgot_password():
     try:
