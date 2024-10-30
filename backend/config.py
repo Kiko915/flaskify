@@ -9,10 +9,14 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SECRET_KEY = os.getenv('SECRET_KEY')
     MAIL_SERVER = 'smtp.gmail.com'
+    #MAIL_SERVER = 'sandbox.smtp.mailtrap.io'
     MAIL_PORT = 587
+    #MAIL_PORT = 2525    
     MAIL_USE_TLS = True
     MAIL_USERNAME = os.getenv('MAIL_USERNAME')
+    #MAIL_USERNAME = 'ca0a8fb76ac6d3'
     MAIL_PASSWORD = 'cqel hbun keid yidv'
+    #MAIL_PASSWORD = 'd326df77ab9430'
     MAIL_USE_SSL = False
 
     # Cloudinary configuration

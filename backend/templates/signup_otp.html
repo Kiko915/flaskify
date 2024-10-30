@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTP Verification</title>
+</head>
+<body style="font-family: Arial, sans-serif; background-color: #f8f9fa; color: #2c3e50; line-height: 1.6; margin: 0; padding: 0;">
+    <div style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+        <div style="background-color: #FFD700; padding: 30px 20px; text-align: center;">
+            <div style="width: 120px; height: 120px; margin: 0 auto 15px; background-color: #ffffff; border-radius: 60px; padding: 15px;">
+                <img src="https://res.cloudinary.com/da3b5g9ad/image/upload/f_auto,q_auto/flaskify-primary_szhmav" alt="Flaskify Logo" style="width: 100%; height: auto;">
+            </div>
+            <h1 style="color: #2c3e50; font-size: 28px; font-weight: bold; margin: 0;">OTP Verification</h1>
+        </div>
+
+        <div style="padding: 40px 30px; text-align: center;">
+            <p style="font-size: 16px; color: #34495e;">To complete your request, please use the OTP code below:</p>
+
+            <div style="font-size: 32px; font-weight: bold; color: #2c3e50; background-color: #f1f3f5; padding: 15px 30px; border-radius: 8px; display: inline-block; margin: 20px 0;">
+                {{ otp_code }}
+            </div>
+
+            <p style="font-size: 16px; color: #34495e;">This code is valid for the next 10 minutes. Please enter it on the verification page to proceed.</p>
+
+            <p style="font-size: 16px; color: #34495e;">If you didn’t request this code, you can safely ignore this email.</p>
+
+      
+        </div>
+
+        <div style="text-align: center; padding: 20px; background-color: #f8f9fa; color: #7f8c8d; font-size: 12px;">
+            <p>&copy; 2024 Flaskify Inc. All rights reserved.</p>
+            <p>You received this email because a request was made to verify your identity with Flaskify.</p>
+            <p><a href="#" style="color: #FFD700; text-decoration: none;">Unsubscribe</a> | <a href="#" style="color: #FFD700; text-decoration: none;">Privacy Policy</a> | <a href="#" style="color: #FFD700; text-decoration: none;">Terms of Service</a></p>
+        </div>
+    </div>
+</body>
+</html>

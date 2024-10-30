@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
 from itsdangerous import SignatureExpired, URLSafeTimedSerializer
+from utils.emails import send_welcome_email, send_otp_email, send_password_reset_email
 
 auth = Blueprint('auth', __name__)
 
@@ -30,9 +31,7 @@ def send_otp():
     db.session.commit()
 
     try:
-        msg = Message('Your OTP Code', sender='francismistica06@gmail.com', recipients=[email])
-        msg.body = f'Your OTP code is {otp}. It will expire in 5 minutes.'
-        mail.send(msg)
+       send_otp_email(email, otp)
     except Exception as e:
         return jsonify({'error': f'Failed to send email: {str(e)}'}), 500
 
@@ -89,7 +88,8 @@ def signup():
         password_hash=generate_password_hash(data.get('password'), method='pbkdf2')  # Set verification status
     )
     
-    print(new_user.password_hash) # Hash the password
+    # send welcome email
+    send_welcome_email(new_user.email, new_user.first_name)
     
     try:
         db.session.add(new_user)
@@ -164,7 +164,7 @@ def forgot_password():
         reset_url = f'http://localhost:5173/auth/reset-password/{token}'
         
         # Send email
-        send_reset_email(email, reset_url)
+        send_password_reset_email(email, reset_url)
         
         return jsonify({'message': 'Password reset email sent'}), 200
     

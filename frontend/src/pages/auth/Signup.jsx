@@ -25,6 +25,7 @@ const SignUp = () => {
     isVerified: false // For phone verification
   });
   const [step, setStep] = useState(1);
+  const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
   async function checkEmail(email) {
@@ -172,7 +173,7 @@ const SignUp = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setIsLoading(true);
     // Validate the final step (password matching)
     const valid = await validateStep();
     
@@ -212,9 +213,12 @@ const SignUp = () => {
       } catch (error) {
         console.error(error);
         toast.error(error.message || "Failed to signup.");
+      } finally {
+        setIsLoading(false);
       }
     } else {
       toast.error("Please fix the issues in the form before submitting.");
+      setIsLoading(false);
     }
   };
   
@@ -284,9 +288,10 @@ const SignUp = () => {
               ) : (
                 <button
                   type="submit"
-                  className="btn hover:font-semibold bg-green-600 inline-flex items-center gap-1 hover:bg-green-700 p-2 px-4 text-white rounded"
+                  disabled={isLoading}
+                  className="btn hover:font-semibold bg-green-600 inline-flex items-center gap-1 hover:bg-green-700 p-2 px-4 text-white rounded disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Submit <Send />
+                  {isLoading ? "Submitting" : "Submit"} <Send />
                 </button>
               )}
             </div>
