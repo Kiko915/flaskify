@@ -196,6 +196,28 @@ def reset_password():
         return jsonify({'message': 'Error processing request', 'error': str(e)}), 500
 
 
+# Change Password from Profile
+@auth.route('/auth/change_password', methods=['POST'])
+@login_required
+def change_password():
+    data = request.json
+    email = current_user.email
+    password = data.get('password')
+
+    if not email or not password:
+        return jsonify({'error': 'Email and password are required'}), 400
+
+    try:
+        user = Users.query.filter_by(email=email).first()
+        if user:
+            user.set_password(password) 
+            db.session.commit()
+            return jsonify({'message': 'Password updated successfully'}), 200
+        return jsonify({'error': 'User not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 # Protected route
 @auth.route('/protected')
 @login_required

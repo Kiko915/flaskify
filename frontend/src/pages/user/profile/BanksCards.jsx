@@ -34,6 +34,7 @@ export default function BanksCards() {
   });
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
+  const [loading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const fetchPaymentMethods = async () => {
@@ -45,6 +46,8 @@ export default function BanksCards() {
         }
       } catch (error) {
         console.error('Error fetching payment methods:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     fetchPaymentMethods();
@@ -242,7 +245,9 @@ export default function BanksCards() {
       onAction={() => setDialogOpen(true)}
     >
       <div className="space-y-4">
-        {paymentMethods.map((method) => (
+        {loading ? <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+          </div> : paymentMethods.map((method) => (
           <div
             key={method.id}
             className="flex items-center justify-between p-4 bg-gray-100 rounded-md"
