@@ -26,6 +26,8 @@ import Addresses from './pages/user/profile/Addresses.jsx';
 import ChangePassword from './pages/user/profile/ChangePassword.jsx';
 import ForgotPassword from './pages/auth/ForgotPassword.jsx';
 import ResetPassword from './pages/auth/ResetPassword.jsx';
+import SellerLayout from './layouts/SellerLayout.jsx';
+import SellerRegister from './pages/seller/SellerRegister.jsx';
 
 const router = createBrowserRouter([
   {
@@ -91,6 +93,22 @@ const router = createBrowserRouter([
           {
             path: "vouchers",
             element: <div>Vouchers Page</div>
+          }
+        ]
+      },
+      {
+        path: "/seller",
+        element: <SellerLayout />,
+        children: [
+          {
+            path: "register",
+            element: <AuthLayout />,
+            children: [
+              {
+                index: true,
+                element: <SellerRegister />
+              }
+            ]
           }
         ]
       }

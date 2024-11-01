@@ -25,6 +25,7 @@ const AppLayout = () => {
 
   // Check for auth routes to hide header
   const isAuthRoute = location.pathname.startsWith('/auth/');
+  const isSellerRegisterRoute = location.pathname.startsWith('/seller/');
   
   return (
     <div>
@@ -32,7 +33,7 @@ const AppLayout = () => {
         <title>Flaskify | Tech powered marketplace.</title>
       </Helmet>
       {/* Show header except for auth routes */}
-      {!isAuthRoute && <Header />}
+      {!isAuthRoute && !isSellerRegisterRoute && <Header />}
       
       {/* Show loader only when loading is true and not on user/auth routes */}
       {loading && <Loader />}

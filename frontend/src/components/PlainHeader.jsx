@@ -14,6 +14,8 @@ export default function PlainHeader() {
       return "Forgot Password";
     } else if (location.pathname === "/auth/reset-password") {
       return "Reset Password";
+    } else if (location.pathname === "/seller/register") {
+      return "Start Selling";
     }
   };
 
