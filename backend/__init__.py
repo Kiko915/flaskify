@@ -177,6 +177,8 @@ class Address(db.Model):
     def __repr__(self):
         return f'<Address {self.address_name} for {self.recipient_name}>'
 
+
+
 class PaymentMethod(db.Model):
     __tablename__ = 'payment_methods'
 
@@ -204,7 +206,87 @@ class PaymentMethod(db.Model):
     def __repr__(self):
         return f'<PaymentMethod {self.id}>'
     
+# Seller Model
+class SellerInfo(db.Model):
+    __tablename__ = 'seller_info'
+    
+    # Use user_uuid as the primary key
+    user_uuid = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), primary_key=True, nullable=False)
+    
+    # Business/Shop Information
+    business_name = db.Column(db.String(255), nullable=False)
+    business_type = db.Column(db.Enum('Individual', 'Registered Business', 'Enterprise'), nullable=False)
+    tax_id = db.Column(db.String(100), nullable=True)  # Optional tax identification number
+    
+    # Contact Information
+    business_email = db.Column(db.String(255), nullable=False)
+    business_phone = db.Column(db.String(20), nullable=False)
+    
+    # Location Details
+    business_country = db.Column(db.String(100), nullable=False)
+    business_province = db.Column(db.String(100), nullable=False)
+    business_city = db.Column(db.String(100), nullable=False)
+    business_address = db.Column(db.String(255), nullable=False)
+    
+    # Seller Status and Verification
+    status = db.Column(db.Enum(
+        'Pending', 
+        'Approved', 
+        'Rejected', 
+    ), default='Pending', nullable=False)
+    
+    # Admin-related fields
+    admin_notes = db.Column(db.Text, nullable=True)  # For admin comments or reasons for rejection
+    approved_by = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), nullable=True)
+    approval_date = db.Column(db.DateTime, nullable=True)
+    
+    # Document Verification
+    business_registration_doc = db.Column(db.String(255), nullable=True)
+    tax_certificate_doc = db.Column(db.String(255), nullable=True)
+    
+    # Additional Seller Metrics
+    total_products = db.Column(db.Integer, default=0)
+    total_sales = db.Column(db.Numeric(10, 2), default=0.00)
+    
+    # Timestamp fields
+    date_registered = db.Column(db.DateTime, default=datetime.now)
+    last_updated = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    user = db.relationship('Users', foreign_keys=[user_uuid])
+    approving_admin = db.relationship('Users', foreign_keys=[approved_by])
+    
+    def __repr__(self):
+        return f'<SellerInfo {self.business_name} - {self.status}>'
+    
+    def update_status(self, new_status, admin_user=None, notes=None):
+        """
+        Update seller status with optional admin notes and approving admin
+        
+        :param new_status: New status for the seller
+        :param admin_user: Admin user approving/updating the status
+        :param notes: Optional notes about the status change
+        """
+        self.status = new_status
+        
+        if admin_user:
+            self.approved_by = admin_user.user_uuid
+            self.approval_date = datetime.now()
+        
+        if notes:
+            self.admin_notes = notes
+        
+        return self
+    
+    def is_approved(self):
+        """
+        Check if seller is approved
+        
+        :return: Boolean indicating approval status
+        """
+        return self.status == 'Approved'
 
+# Create app instance
 def create_app():
     app = Flask(__name__)
     
