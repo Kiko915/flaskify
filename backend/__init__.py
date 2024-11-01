@@ -211,7 +211,7 @@ class SellerInfo(db.Model):
     __tablename__ = 'seller_info'
     
     # Use user_uuid as the primary key
-    user_uuid = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), primary_key=True, nullable=False)
+    seller_uuid = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), primary_key=True, nullable=False)
     
     # Business/Shop Information
     business_name = db.Column(db.String(255), nullable=False)
