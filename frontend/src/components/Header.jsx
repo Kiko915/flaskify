@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import logo from '/assets/flaskify-wordmark-noslogan.png';
-import { Bell, Heart, HelpCircle, ShoppingCart } from 'lucide-react';
+import { Bell, Gauge, Heart, HelpCircle, ShoppingCart } from 'lucide-react';
 import SearchComponent from './SearchComponent';
 import { useAuth } from '../utils/AuthContext';
 import UserPopover from './UserPopover';
@@ -12,10 +12,14 @@ const Header = () => {
     <header className='py-2 w-full sticky top-0 z-10 border-b bg-white'>
       <div className='mb-2 px-4 lg:px-12' id='top_nav'>
         <div className='flex items-center justify-between text-xs lg:text-sm'>
-          <ul className='flex items-center gap-2'>
+          {!loading && user?.role !== "Admin" && <ul className='flex items-center gap-2'>
             {user?.role === "Seller" && <li><Link to='/seller/center'>Seller Centre</Link></li>}
             <li><Link to='/seller/register'>Start Selling</Link></li>
+          </ul>}
+          {!loading && user?.role === "Admin" && <ul className='flex items-center gap-2'>
+            <li><Link to='/admin/dashboard' className='inline-flex items-center gap-2 hover:text-yellow-500'><Gauge />  Admin Dashboard</Link></li>
           </ul>
+          }
 
           <ul className='flex items-center gap-2'>
             <li>
@@ -73,16 +77,16 @@ const Header = () => {
           <SearchComponent />
         </div>
         <div className='flex items-center gap-4'>
-        <div className='flaskify_wishhlist lg:w-auto'>
-          <Link to='/wishlist' className='text-gray-600'>
-            <Heart size={24} />
-          </Link>
-        </div>
-        <div className="flaskify_cart w-1/3 lg:w-auto flex justify-end">
-          <Link to='/cart' className='text-gray-600'>
-            <ShoppingCart size={24} />
-          </Link>
-        </div>
+          <div className='flaskify_wishhlist lg:w-auto'>
+            <Link to='/wishlist' className='text-gray-600'>
+              <Heart size={24} />
+            </Link>
+          </div>
+          <div className="flaskify_cart w-1/3 lg:w-auto flex justify-end">
+            <Link to='/cart' className='text-gray-600'>
+              <ShoppingCart size={24} />
+            </Link>
+          </div>
         </div>
       </div>
 
