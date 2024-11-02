@@ -98,7 +98,7 @@ const router = createBrowserRouter([
       },
       {
         path: "/seller",
-        element: <SellerLayout />,
+        element: <ProtectedRoute><SellerLayout /></ProtectedRoute>,
         children: [
           {
             path: "register",
@@ -116,7 +116,7 @@ const router = createBrowserRouter([
   },
 ]);
 
-createRoot(document.getElementById('root')).render(
+createRoot(document.getElementById('flaskify-root')).render(
   <StrictMode>
     <HelmetProvider>
       <AuthProvider>

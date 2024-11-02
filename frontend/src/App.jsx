@@ -13,8 +13,9 @@ const AppLayout = () => {
     // Don't show loader for auth routes and user routes
     const isAuthRoute = location.pathname.startsWith('/auth/');
     const isUserRoute = location.pathname.startsWith('/user/');
+    const isSellerRegisterRoute = location.pathname.startsWith('/seller/register');
     
-    if (!isAuthRoute && !isUserRoute) {
+    if (!isAuthRoute && !isUserRoute && !isSellerRegisterRoute) {
       setLoading(true);
       const timer = setTimeout(() => {
         setLoading(false);
@@ -25,7 +26,7 @@ const AppLayout = () => {
 
   // Check for auth routes to hide header
   const isAuthRoute = location.pathname.startsWith('/auth/');
-  const isSellerRegisterRoute = location.pathname.startsWith('/seller/');
+  const isSellerRegisterRoute = location.pathname.startsWith('/seller/register');
   
   return (
     <div>
@@ -39,7 +40,7 @@ const AppLayout = () => {
       {loading && <Loader />}
       
       {/* Show content when not loading or on user/auth routes */}
-      {(!loading || location.pathname.startsWith('/user/') || location.pathname.startsWith('/auth/')) && <Outlet />}
+      {(!loading || location.pathname.startsWith('/user/') || location.pathname.startsWith('/auth/') || isSellerRegisterRoute) && <Outlet />}
       
       <Footer />
     </div>

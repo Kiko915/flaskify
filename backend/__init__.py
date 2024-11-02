@@ -215,8 +215,9 @@ class SellerInfo(db.Model):
     
     # Business/Shop Information
     business_name = db.Column(db.String(255), nullable=False)
-    business_type = db.Column(db.Enum('Individual', 'Registered Business', 'Enterprise'), nullable=False)
+    business_type = db.Column(db.Enum('Individual', 'Registered Business'), nullable=False)
     tax_id = db.Column(db.String(100), nullable=True)  # Optional tax identification number
+    business_owner = db.Column(db.String(255), nullable=False)
     
     # Contact Information
     business_email = db.Column(db.String(255), nullable=False)
@@ -253,7 +254,7 @@ class SellerInfo(db.Model):
     last_updated = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relationships
-    user = db.relationship('Users', foreign_keys=[user_uuid])
+    user = db.relationship('Users', foreign_keys=[seller_uuid])
     approving_admin = db.relationship('Users', foreign_keys=[approved_by])
     
     def __repr__(self):
@@ -317,6 +318,9 @@ def create_app():
 
     from profile import profile_bp
     app.register_blueprint(profile_bp)
+
+    from seller import seller
+    app.register_blueprint(seller)
 
     return app
 
