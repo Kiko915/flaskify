@@ -159,7 +159,6 @@ def get_seller(seller_id):
 
 @seller.route('/seller/status', methods=['GET'])
 @login_required
-@role_required([Role.ADMIN, Role.SELLER])
 def check_status():
     email = request.args.get('email')
     seller = SellerInfo.query.filter_by(business_email=email).first()
