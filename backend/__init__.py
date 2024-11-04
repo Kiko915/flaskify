@@ -20,7 +20,7 @@ class Role(str, Enum):
     ADMIN = "Admin"
     SELLER = "Seller"
     BUYER = "Buyer"
-
+    
 class Users(db.Model, UserMixin):
     __tablename__ = 'users'
     

@@ -5,6 +5,7 @@ from sqlalchemy import or_
 from __init__ import SellerInfo, Shop, db, Users, Role  # Ensure Shop is imported
 from utils.emails import send_seller_approval_email
 import cloudinary.uploader
+from utils.auth_utils import role_required
 
 seller = Blueprint('seller', __name__)
 
@@ -120,6 +121,7 @@ def check_availability():
 
 @seller.route('/sellers', methods=['GET'])
 @login_required
+@role_required(Role.ADMIN)
 def get_all_sellers():
     sellers = SellerInfo.query.all()
     print(sellers)
@@ -137,6 +139,7 @@ def get_all_sellers():
 
 @seller.route('/seller/<string:seller_id>', methods=['GET'])
 @login_required
+@role_required([Role.ADMIN, Role.SELLER])
 def get_seller(seller_id):
     seller = SellerInfo.query.get(seller_id)
     """if not seller or seller.user_uuid != current_user.user_uuid:
@@ -156,6 +159,7 @@ def get_seller(seller_id):
 
 @seller.route('/seller/status', methods=['GET'])
 @login_required
+@role_required([Role.ADMIN, Role.SELLER])
 def check_status():
     email = request.args.get('email')
     seller = SellerInfo.query.filter_by(business_email=email).first()
@@ -167,6 +171,7 @@ def check_status():
 
 @seller.route('/seller/<string:seller_id>', methods=['PUT'])
 @login_required
+@role_required([Role.ADMIN, Role.SELLER])
 def update_seller(seller_id):
     seller = SellerInfo.query.get(seller_id)
     if not seller or seller.user_uuid != current_user.user_uuid:
@@ -193,6 +198,7 @@ def update_seller(seller_id):
 
 @seller.route('/admin/seller/<string:seller_id>/status', methods=['PATCH'])
 @login_required
+@role_required(Role.ADMIN)
 def update_seller_status(seller_id):
     if not current_user.is_admin():  
         return jsonify({"error": "Access denied. Admins only"}), 403

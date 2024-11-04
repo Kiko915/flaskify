@@ -438,14 +438,14 @@ const SellerVerifications = () => {
           
           <Separator className="mt-4" />
           <div className="flex justify-end gap-4">
-            <Button variant="outline" onClick={() => setHandleAccept(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => setHandleAccept({ open: false })}>Cancel</Button>
             <Button type="submit" variant="default" className="bg-green-600 hover:bg-green-700">Approve</Button>
           </div>
           </form>
         </DialogContent>
       </Dialog>
 
-      <Dialog open={handleReject} onOpenChange={setHandleReject}>
+      <Dialog open={handleReject.open} onOpenChange={setHandleReject.open}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Do you want to reject this seller?</DialogTitle>
@@ -454,8 +454,8 @@ const SellerVerifications = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="flex justify-end gap-4">
-            <Button variant="outline" onClick={() => setHandleReject(false)}>Cancel</Button>
-            <Button variant="default" className="bg-red-600 hover:bg-red-700" onClick={() => setHandleReject(false)}>Reject</Button>
+            <Button variant="outline" onClick={() => setHandleReject({ open: false })}>Cancel</Button>
+            <Button variant="default" className="bg-red-600 hover:bg-red-700" onClick={() => setHandleReject({ open: false })}>Reject</Button>
           </div>
         </DialogContent>
       </Dialog>
