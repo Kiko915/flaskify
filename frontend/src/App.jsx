@@ -14,8 +14,9 @@ const AppLayout = () => {
     const isAuthRoute = location.pathname.startsWith('/auth/');
     const isUserRoute = location.pathname.startsWith('/user/');
     const isSellerRegisterRoute = location.pathname.startsWith('/seller/register');
+    const isAdminRoute = location.pathname.startsWith('/admin');
     
-    if (!isAuthRoute && !isUserRoute && !isSellerRegisterRoute) {
+    if (!isAuthRoute && !isUserRoute && !isSellerRegisterRoute && !isAdminRoute) {
       setLoading(true);
       const timer = setTimeout(() => {
         setLoading(false);
@@ -27,6 +28,7 @@ const AppLayout = () => {
   // Check for auth routes to hide header
   const isAuthRoute = location.pathname.startsWith('/auth/');
   const isSellerRegisterRoute = location.pathname.startsWith('/seller/register');
+  const isAdminRoute = location.pathname.startsWith('/admin');
   
   return (
     <div>
@@ -34,7 +36,7 @@ const AppLayout = () => {
         <title>Flaskify | Tech powered marketplace.</title>
       </Helmet>
       {/* Show header except for auth routes */}
-      {!isAuthRoute && !isSellerRegisterRoute && <Header />}
+      {!isAuthRoute && !isSellerRegisterRoute && !isAdminRoute && <Header />}
       
       {/* Show loader only when loading is true and not on user/auth routes */}
       {loading && <Loader />}

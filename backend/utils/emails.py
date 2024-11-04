@@ -21,3 +21,11 @@ def send_password_reset_email(email, reset_url):
     msg = Message('Password Reset Request', sender='francismistica06@gmail.com', recipients=[email])
     msg.html = render_template('reset-password.html', reset_password_url=reset_url, user_email=email)
     mail.send(msg)
+
+
+def send_seller_approval_email(email, user_name):
+    msg = Message('Your Seller Account is Approved!',
+                  sender='francismistica06@gmail.com',
+                  recipients=[email])
+    msg.html = render_template('seller-approval-notification.html', user_name=user_name)
+    mail.send(msg)

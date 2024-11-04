@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import UserCard from '../components/user/UserCard';
 import UserProfileImage from '../components/user/UserProfileImage';
 import { useAuth } from '../utils/AuthContext';
-import { Camera, Mail, Phone, X } from 'lucide-react';
+import { Camera, Mail, Phone, Sparkle, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Badge } from '@/components/ui/badge';
 
 const Profile = () => {
   const { user, loading, fetchUser } = useAuth();
@@ -212,7 +213,7 @@ const Profile = () => {
             />
           </div>
           <div className="flex-1">
-            <h3 className="text-xl font-semibold text-gray-900">{user.username}</h3>
+            <h3 className="text-xl gap-2 inline-flex items-center font-semibold text-gray-900">{user.username}{user?.role === "Admin" && <span><Badge className="text-xs bg-yellow-600 hover:bg-yellow-500"><Sparkle className='w-4 mr-1' /> Admin</Badge></span>}</h3>
             <p className="text-sm text-gray-500 mt-1">Member since {formatDate(user.date_joined)}</p>
             <div className="text-xs text-gray-500 mt-4">
               <p>Supported formats: .JPEG, .PNG</p>

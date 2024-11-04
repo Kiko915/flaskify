@@ -28,6 +28,12 @@ import ForgotPassword from './pages/auth/ForgotPassword.jsx';
 import ResetPassword from './pages/auth/ResetPassword.jsx';
 import SellerLayout from './layouts/SellerLayout.jsx';
 import SellerRegister from './pages/seller/SellerRegister.jsx';
+import AdminLayout from './layouts/AdminLayout.jsx';
+import { ROLES } from './utils/Enum.js';
+import SellerManagement from './pages/admin/seller-management/SellerManagement.jsx';
+import SellerVerifications from './pages/admin/seller-management/SellerVerifications.jsx';
+import SellerCenter from './layouts/SellerCenter.jsx';
+import SellerDashboard from './pages/seller/seller-center/SellerDashboard.jsx';
 
 const router = createBrowserRouter([
   {
@@ -60,6 +66,10 @@ const router = createBrowserRouter([
       {
         path: "/",
         element: <Home />
+      },
+      {
+        path: "/unauthorized",
+        element: <p>Unauthorized to view this Page</p>
       },
       {
         path: "/user",
@@ -109,6 +119,35 @@ const router = createBrowserRouter([
                 element: <SellerRegister />
               }
             ]
+          },
+          {
+            path: "seller-center",
+            element: <ProtectedRoute roles={[ROLES.SELLER]}><SellerCenter /></ProtectedRoute>,
+            children: [
+              {
+                index: true,
+                element: <SellerDashboard />
+              }
+            ]
+          }
+        ]
+      },
+      
+      {
+        path: "/admin",
+        element: <ProtectedRoute roles={[ROLES.ADMIN]}><AdminLayout /></ProtectedRoute>,
+        children: [
+          {
+            path: "dashboard",
+            element: <div>Dashboard Page</div>
+          },
+          {
+            path: "sellers",
+            element: <SellerManagement />
+          },
+          {
+            path: "sellers/verification",
+            element: <SellerVerifications />
           }
         ]
       }

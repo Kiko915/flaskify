@@ -1,24 +1,18 @@
 import FCarousel from "@/components/misc/FCarousel";
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/utils/AuthContext";
-import { MailCheckIcon } from "lucide-react";
-import { useState } from "react";
+import { MailCheckIcon, UserCheck } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Helmet } from "react-helmet-async";
 import toast from "react-hot-toast";
+import { Link } from "react-router-dom";
 
 export default function SellerRegister() {
   const { user } = useAuth();
   const [formData, setFormData] = useState({
-    shopName: '',
-    ownerName: '',
-    email: '',
+    ownerName: user?.first_name + " " + user?.last_name || '',
+    email: user?.email || '',
     phNum: user?.phone || '',
-    address: '',
-    pickupAddress: {
-      country: '',
-      province: '',
-      city: '',
-      completeAddress: ''
-    },
     sellerType: 'Individual',
     hasTIN: false,
     tinNumber: '',
@@ -26,41 +20,31 @@ export default function SellerRegister() {
   });
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const [validationErrors, setValidationErrors] = useState({});
+  const [registrationStatus, setRegistrationStatus] = useState(null);
+  const [fetchingStatus, setFetchingStatus] = useState(true);
 
-  // Debounced validation check
-  const checkAvailability = async (field, value) => {
-    try {
-      const response = await fetch('http://localhost:5555/seller/check-availability', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          [field === 'shopName' ? 'business_name' : 'email']: value
-        }),
-      });
+  useEffect(() => {
+    // Fetch the user status from the backend if needed
+    const fetchStatus = async () => {
+      try {
+        const response = await fetch(`http://localhost:5555/seller/status?email=${user.email}`, {
+          credentials: "include",
+        });
+        if (response.ok) {
+          const { status } = await response.json();
+          setRegistrationStatus(status);
+          console.log("Registration status:", status);
+        }
+      } catch (error) {
+        console.error("Error fetching registration status:", error);
+      } finally {
+        setFetchingStatus(false);
+      };
+    };
 
-      if (!response.ok) {
-        const data = await response.json();
-        setValidationErrors(prev => ({
-          ...prev,
-          [field]: data.message
-        }));
-        return false;
-      }
+      fetchStatus();
+    }, [user])
 
-      setValidationErrors(prev => ({
-        ...prev,
-        [field]: null
-      }));
-      return true;
-    } catch (error) {
-      console.error('Validation check failed:', error);
-      return false;
-    }
-  };
 
   const handleInputChange = async (e) => {
     const { name, value } = e.target;
@@ -76,13 +60,6 @@ export default function SellerRegister() {
       }));
     } else {
       setFormData(prev => ({ ...prev, [name]: value }));
-
-      // Check availability for business name and email
-      if (name === 'shopName' || name === 'email') {
-        if (value.length >= 3) { // Only check if value is long enough
-          await checkAvailability(name, value);
-        }
-      }
     }
   };
 
@@ -99,22 +76,15 @@ export default function SellerRegister() {
     e.preventDefault();
     setLoading(true);
 
-    // Check if there are any validation errors
-    if (Object.values(validationErrors).some(error => error)) {
-      toast.error("Please fix the validation errors before submitting");
-      return;
-    }
 
     try {
       // Create FormData object
       const formDataToSend = new FormData();
 
       // Add basic fields
-      formDataToSend.append('shopName', formData.shopName);
       formDataToSend.append('ownerName', formData.ownerName);
       formDataToSend.append('email', formData.email);
       formDataToSend.append('phNum', formData.phNum);
-      formDataToSend.append('address', formData.address);
       formDataToSend.append('sellerType', formData.sellerType);
       formDataToSend.append('hasTIN', formData.hasTIN);
 
@@ -122,11 +92,6 @@ export default function SellerRegister() {
       if (formData.hasTIN) {
         formDataToSend.append('tinNumber', formData.tinNumber);
       }
-
-      // Add pickup address fields
-      Object.entries(formData.pickupAddress).forEach(([key, value]) => {
-        formDataToSend.append(`pickupAddress.${key}`, value);
-      });
 
       // Add BIR certificate if available
       if (formData.birCertificate) {
@@ -162,17 +127,9 @@ export default function SellerRegister() {
 
   const resetForm = () => {
     setFormData({
-      shopName: '',
-      ownerName: '',
-      email: '',
+      ownerName: user?.first_name + " " + user?.last_name || '',
+      email: user?.email || '',
       phNum: user?.phone || '',
-      address: '',
-      pickupAddress: {
-        country: '',
-        province: '',
-        city: '',
-        completeAddress: ''
-      },
       sellerType: 'Individual',
       hasTIN: false,
       tinNumber: '',
@@ -199,6 +156,39 @@ export default function SellerRegister() {
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Start Selling on Flaskify</h1>
                 <p className="text-gray-600">Be one of the successful sellers on our platform</p>
               </div>
+              {fetchingStatus && (
+                <div className="my-8">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
+                    <h4 className="text-xl font-bold my-4">Checking Registration Status</h4>
+                  </div>
+                </div>
+              )}
+
+              {registrationStatus === "Pending" && (
+                <div className="my-8">
+                  <MailCheckIcon className="text-yellow-600 w-28 h-28 mx-auto" />
+                  <h4 className="text-xl font-bold my-4">
+                    Registration Pending
+                  </h4>
+                  <p className="mb-6 text-yellow-600 bg-yellow-100 p-4 rounded-md">
+                    Your registration is under review. We will notify you once approved.
+                  </p>
+                </div>
+              )}
+
+              {registrationStatus === "Approved" && (
+                <div className="my-8">
+                  <UserCheck className="text-green-600 w-28 h-28 mx-auto" />
+                  <h4 className="text-xl font-bold my-4">Already a Seller!</h4>
+                  <p className="text-green-600 bg-green-100 p-4 rounded-md">
+                    Congratulations! You are approved as a seller on Flaskify.
+                  </p>
+                  <Button asChild className="w-full bg-yellow-500 hover:bg-yellow-600 font-bold my-4">
+                    <Link to="/seller/seller-center" replace>Seller Dashboard</Link>
+                  </Button>
+                </div>
+              )}
 
               {successMessage && (
                 <div className="my-8">
@@ -209,29 +199,10 @@ export default function SellerRegister() {
                   <div className="mb-6 text-green-600 bg-green-100 p-4 rounded-md">
                     {successMessage}
                   </div>
-                  <button onClick={resetForm} className="bg-yellow-500 hover:bg-yellow-600 mx-auto px-4 py-2 rounded font-medium w-full text-white">Submit Another Store</button>
                 </div>
               )}
-              {!successMessage && (
+              {!fetchingStatus && !successMessage && !registrationStatus && (
                 <form className="space-y-6" onSubmit={handleSubmit}>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1" htmlFor="shopName">
-                      Shop Name
-                    </label>
-                    <input
-                      id="shopName"
-                      name="shopName"
-                      type="text"
-                      required
-                      value={formData.shopName}
-                      onChange={handleInputChange}
-                      className={`mt-1 block w-full px-4 py-2 rounded-lg border ${validationErrors.shopName ? 'border-red-500' : 'border-gray-300'
-                        } shadow-sm focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500`}
-                    />
-                    {validationErrors.shopName && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.shopName}</p>
-                    )}
-                  </div>
 
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-1" htmlFor="ownerName">Owner&apos;s Name</label>
@@ -255,14 +226,12 @@ export default function SellerRegister() {
                       name="email"
                       type="email"
                       required
+                      disabled
                       value={formData.email}
                       onChange={handleInputChange}
-                      className={`mt-1 block w-full px-4 py-2 rounded-lg border ${validationErrors.email ? 'border-red-500' : 'border-gray-300'
-                        } shadow-sm focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500`}
+                      className={`mt-1 block w-full px-4 py-2 rounded-lg border shadow-sm focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500`}
                     />
-                    {validationErrors.email && (
-                      <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
-                    )}
+
                   </div>
 
                   <div>
@@ -274,43 +243,6 @@ export default function SellerRegister() {
                       value={formData.phNum}
                       disabled
                       className="mt-1 block w-full px-4 py-2 rounded-lg border border-gray-300 shadow-sm focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500"
-                    />
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-gray-700">Pickup Address</h3>
-
-                    <input
-                      name="pickupAddress.country"
-                      type="text"
-                      placeholder="Country"
-                      value={formData.pickupAddress.country}
-                      onChange={handleInputChange}
-                      className="block w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500"
-                    />
-                    <input
-                      name="pickupAddress.province"
-                      type="text"
-                      placeholder="Province"
-                      value={formData.pickupAddress.province}
-                      onChange={handleInputChange}
-                      className="block w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500"
-                    />
-                    <input
-                      name="pickupAddress.city"
-                      type="text"
-                      placeholder="City"
-                      value={formData.pickupAddress.city}
-                      onChange={handleInputChange}
-                      className="block w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500"
-                    />
-                    <input
-                      name="pickupAddress.completeAddress"
-                      type="text"
-                      placeholder="Complete Address"
-                      value={formData.pickupAddress.completeAddress}
-                      onChange={handleInputChange}
-                      className="block w-full px-4 py-2 rounded-lg border border-gray-300 focus:border-yellow-500 focus:ring-2 focus:ring-yellow-500"
                     />
                   </div>
 

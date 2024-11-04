@@ -8,12 +8,18 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import uuid
 from flask_login import UserMixin
-from sqlalchemy.orm import validates
+from sqlalchemy.orm import validates, relationship
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
+from enum import Enum
 
 
 db = SQLAlchemy()
 mail = Mail()
+
+class Role(str, Enum):
+    ADMIN = "Admin"
+    SELLER = "Seller"
+    BUYER = "Buyer"
 
 class Users(db.Model, UserMixin):
     __tablename__ = 'users'
@@ -86,6 +92,9 @@ class Users(db.Model, UserMixin):
 
     def __repr__(self):
         return f'<User {self.first_name} {self.last_name}>'
+    
+    def is_admin(self):
+        return self.role == Role.ADMIN and self.admin_info is not None
 
 
 class OTP(db.Model):
@@ -210,43 +219,35 @@ class PaymentMethod(db.Model):
 class SellerInfo(db.Model):
     __tablename__ = 'seller_info'
     
-    # Use user_uuid as the primary key
-    seller_uuid = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), primary_key=True, nullable=False)
+    # Primary Key (now a unique identifier for the seller record)
+    seller_id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     
-    # Business/Shop Information
-    business_name = db.Column(db.String(255), nullable=False)
+    # Foreign Key to Users table
+    user_uuid = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), unique=True, nullable=False)
+    
+    # Seller Personal/Business Information
+    tax_id = db.Column(db.String(100), nullable=True)
     business_type = db.Column(db.Enum('Individual', 'Registered Business'), nullable=False)
-    tax_id = db.Column(db.String(100), nullable=True)  # Optional tax identification number
     business_owner = db.Column(db.String(255), nullable=False)
-    
-    # Contact Information
     business_email = db.Column(db.String(255), nullable=False)
     business_phone = db.Column(db.String(20), nullable=False)
     
-    # Location Details
-    business_country = db.Column(db.String(100), nullable=False)
-    business_province = db.Column(db.String(100), nullable=False)
-    business_city = db.Column(db.String(100), nullable=False)
-    business_address = db.Column(db.String(255), nullable=False)
-    
     # Seller Status and Verification
     status = db.Column(db.Enum(
-        'Pending', 
-        'Approved', 
-        'Rejected', 
+        'Pending',
+        'Approved',
+        'Rejected'
     ), default='Pending', nullable=False)
     
     # Admin-related fields
-    admin_notes = db.Column(db.Text, nullable=True)  # For admin comments or reasons for rejection
+    admin_notes = db.Column(db.Text, nullable=True)
     approved_by = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), nullable=True)
     approval_date = db.Column(db.DateTime, nullable=True)
     
     # Document Verification
-    business_registration_doc = db.Column(db.String(255), nullable=True)
     tax_certificate_doc = db.Column(db.String(255), nullable=True)
     
-    # Additional Seller Metrics
-    total_products = db.Column(db.Integer, default=0)
+    # Aggregated Metrics (can be calculated from shops)
     total_sales = db.Column(db.Numeric(10, 2), default=0.00)
     
     # Timestamp fields
@@ -254,11 +255,12 @@ class SellerInfo(db.Model):
     last_updated = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
     # Relationships
-    user = db.relationship('Users', foreign_keys=[seller_uuid])
+    user = db.relationship('Users', foreign_keys=[user_uuid], backref='seller_info')
     approving_admin = db.relationship('Users', foreign_keys=[approved_by])
+    shops = db.relationship('Shop', back_populates='seller', lazy='dynamic')
     
     def __repr__(self):
-        return f'<SellerInfo {self.business_name} - {self.status}>'
+        return f'<SellerInfo {self.user_uuid} - {self.status}>'
     
     def update_status(self, new_status, admin_user=None, notes=None):
         """
@@ -286,6 +288,70 @@ class SellerInfo(db.Model):
         :return: Boolean indicating approval status
         """
         return self.status == 'Approved'
+
+
+class Shop(db.Model):
+    __tablename__ = 'shops'
+    
+    # Primary Key
+    shop_uuid = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    
+    # Foreign Key to Seller
+    seller_id = db.Column(db.String(36), db.ForeignKey('seller_info.seller_id'), nullable=False)
+    
+    # Shop Information
+    business_name = db.Column(db.String(255), nullable=False)
+    
+    # Location Details
+    business_country = db.Column(db.String(100), nullable=False)
+    business_province = db.Column(db.String(100), nullable=False)
+    business_city = db.Column(db.String(100), nullable=False)
+    business_address = db.Column(db.String(255), nullable=False)
+    
+    # Shop-specific Documentation
+    business_registration_doc = db.Column(db.String(255), nullable=True)
+    
+    # Shop Metrics
+    total_products = db.Column(db.Integer, default=0)
+    shop_sales = db.Column(db.Numeric(10, 2), default=0.00)
+    
+    # Timestamp fields
+    date_created = db.Column(db.DateTime, default=datetime.now)
+    last_updated = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+    
+    # Relationships
+    seller = db.relationship('SellerInfo', back_populates='shops')
+    
+    def __repr__(self):
+        return f'<Shop {self.business_name}>'
+    
+    @property
+    def is_active(self):
+        """
+        Check if shop's seller is approved
+        
+        :return: Boolean indicating if shop can operate
+        """
+        return self.seller.is_approved()
+
+
+class AdminInfo(db.Model):
+    __tablename__ = 'admin_info'
+
+    # Foreign key linking to Users
+    admin_id = db.Column(db.String(36), db.ForeignKey('users.user_uuid'), primary_key=True)
+    admin_email = db.Column(db.String(120), unique=True, nullable=False)
+    admin_name = db.Column(db.String(100), nullable=False)
+    role = db.Column(db.String(50), default="Admin", nullable=False)  # Admin-specific roles (e.g., super_admin)
+    permissions = db.Column(db.Text, nullable=True)  # JSON or text for flexible permission settings
+    created_at = db.Column(db.DateTime, default=datetime.now, nullable=False)
+    last_login = db.Column(db.DateTime)
+
+    # Relationship to Users model
+    user = db.relationship('Users', backref=db.backref('admin_info', uselist=False))
+
+    def __repr__(self):
+        return f'<AdminInfo {self.admin_name}>'
 
 # Create app instance
 def create_app():
