@@ -3,9 +3,11 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/utils/AuthContext";
 import { MailCheckIcon, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
+import Confetti from "react-confetti";
 import { Helmet } from "react-helmet-async";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
+import { useWindowSize } from "react-use";
 
 export default function SellerRegister() {
   const { user } = useAuth();
@@ -22,8 +24,16 @@ export default function SellerRegister() {
   const [loading, setLoading] = useState(false);
   const [registrationStatus, setRegistrationStatus] = useState(null);
   const [fetchingStatus, setFetchingStatus] = useState(true);
+  const [confettiActive, setConfettiActive] = useState(false);
+  const { width, height } = useWindowSize();
 
   useEffect(() => {
+    // show confetti for 5 seconds
+    if (registrationStatus === "Approved") {
+      setConfettiActive(true);
+    }
+
+
     // Fetch the user status from the backend if needed
     const fetchStatus = async () => {
       try {
@@ -43,7 +53,7 @@ export default function SellerRegister() {
     };
 
       fetchStatus();
-    }, [user])
+    }, [user, registrationStatus])
 
 
   const handleInputChange = async (e) => {
@@ -178,6 +188,8 @@ export default function SellerRegister() {
               )}
 
               {registrationStatus === "Approved" && (
+                <>
+                {confettiActive && <Confetti width={width} height={height} numberOfPieces={500} recycle={false} />}
                 <div className="my-8">
                   <UserCheck className="text-green-600 w-28 h-28 mx-auto" />
                   <h4 className="text-xl font-bold my-4">Already a Seller!</h4>
@@ -188,6 +200,7 @@ export default function SellerRegister() {
                     <Link to="/seller/seller-center" replace>Seller Dashboard</Link>
                   </Button>
                 </div>
+                </>
               )}
 
               {successMessage && (
