@@ -13,11 +13,12 @@ const Header = () => {
       <div className='mb-2 px-4 lg:px-12' id='top_nav'>
         <div className='flex items-center justify-between text-xs lg:text-sm'>
           {!loading && user?.role !== "Admin" && <ul className='flex items-center gap-2'>
-            {user?.role === "Seller" && <li><Link to='/seller/seller-center'>Seller Center</Link></li>}
-            <li><Link to='/seller/register'>Start Selling</Link></li> 
+            {user?.role === "Seller" && <><li><Link to='/seller/seller-center' className='hover:font-bold'>Seller Center</Link></li><span>|</span></>}
+            
+            <li><Link to='/seller/register' className='hover:font-bold'>Start Selling</Link></li> 
           </ul>}
           {!loading && user?.role === "Admin" && <ul className='flex items-center gap-2'>
-            <li><Link to='/admin/dashboard' className='inline-flex items-center gap-2 hover:text-yellow-500'><Gauge />  Admin Dashboard</Link></li>
+            <li><Link to='/admin/dashboard' className='inline-flex hover:font-bold items-center gap-2 hover:text-yellow-500'><Gauge />  Admin Dashboard</Link></li>
           </ul>
           }
 
