@@ -154,6 +154,42 @@ const SellerVerifications = () => {
     }
   };
 
+  const handleRejection = async (e) => {
+    e.preventDefault();
+    try {
+      // Implement your status update API call here
+      setError(null);
+      setLoading(true);
+      const response = await fetch(`http://localhost:5555//admin/seller/${handleReject.id}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData2),
+        credentials: 'include',
+      });
+      if (response.ok) {
+        setHandleReject(true);
+        setFormData2({
+          status: 'Rejected',
+          remarks: '',
+          approved_by: user?.user_uuid
+        });
+        setLoading(false);
+        setIsDialogOpen(false);
+        setSelectedSeller(null);
+        fetchSellers();
+      } else {
+        setError('Failed to update status');
+      }
+    } catch (err) {
+      setError('Failed to update status: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   // Update seller status
   const handleUpdateStatus = async (sellerId, newStatus) => {
     try {
@@ -380,7 +416,7 @@ const SellerVerifications = () => {
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => setHandleReject(true)}
+                                onClick={() => setHandleReject({ id: seller.id, open: true })}
                               >
                                 Reject
                               </Button>
@@ -453,10 +489,25 @@ const SellerVerifications = () => {
               Add additional information about the rejection action
             </DialogDescription>
           </DialogHeader>
+          <form className='space-y-4' onSubmit={handleRejection} >
+            <div className='space-y-2'>
+              <Label htmlFor="admin_notes">Admin Notes</Label>
+              <Textarea id="admin_notes" name="remarks" placeholder="Enter admin notes" maxLength={250} onChange={(e) => handleInputChange2(e)} value={formData2.remarks} />
+              <p className="text-sm text-muted-foreground text-right">
+                {formData2.remarks?.length || 0} / 250 characters
+              </p>
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor="approved_by">Rejected By</Label>
+              <Input id="approved_by" name="approved_by" placeholder="Approved By" required value={user?.username + " - " + user?.role} disabled />
+            </div>
+          
+          <Separator className="mt-4" />
           <div className="flex justify-end gap-4">
             <Button variant="outline" onClick={() => setHandleReject({ open: false })}>Cancel</Button>
-            <Button variant="default" className="bg-red-600 hover:bg-red-700" onClick={() => setHandleReject({ open: false })}>Reject</Button>
+            <Button type="submit" variant="default" className="bg-red-600 hover:bg-red-700">Reject</Button>
           </div>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

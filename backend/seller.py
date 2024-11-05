@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from datetime import datetime
 from sqlalchemy import or_
 from __init__ import SellerInfo, Shop, db, Users, Role  # Ensure Shop is imported
-from utils.emails import send_seller_approval_email
+from utils.emails import send_seller_approval_email, send_seller_rejection_email
 import cloudinary.uploader
 from utils.auth_utils import role_required
 
@@ -201,44 +201,63 @@ def update_seller(seller_id):
 def update_seller_status(seller_id):
     if not current_user.is_admin():  
         return jsonify({"error": "Access denied. Admins only"}), 403
-    
+   
     seller = SellerInfo.query.get(seller_id)
     if not seller:
         return jsonify({"error": "Seller not found"}), 404
-    
+   
     data = request.get_json()
     new_status = data.get('status')
     admin_notes = data.get('remarks')
-    
+   
     # Validate status
     if new_status not in ['Pending', 'Approved', 'Rejected']:
         return jsonify({"error": "Invalid status"}), 400
-    
+   
     try:
-        # Update seller status with admin info
-        seller.update_status(new_status, current_user, admin_notes)  # Pass current_user as admin
-        
-        # If status is Approved, update user role to Seller
-        if new_status == 'Approved':
-            user = Users.query.get(seller.user_uuid)  # Assuming seller model has user_id field
-            if user:
-                # Option 2: If using role enum
-                user.role = Role.SELLER
-                
-                # Option 3: If using many-to-many relationship with Role model
-                # seller_role = Role.query.filter_by(name='seller').first()
-                # if seller_role and seller_role not in user.roles:
-                #     user.roles.append(seller_role)
-        
-        # Send email notification to seller
-        send_seller_approval_email(seller.business_email, seller.business_owner)
-
-        db.session.commit()
-        return jsonify({
-            "message": f"Seller status updated to {new_status}",
-            "role_updated": new_status == 'Approved'
-        })
-        
+        if new_status == 'Rejected':
+            # Store email and owner name before deletion for email notification
+            business_email = seller.business_email
+            business_owner = seller.business_owner
+            
+            # Update status first (for audit purposes if needed)
+            seller.update_status(new_status, current_user, admin_notes)
+            
+            """# Update associated user role back to USER if needed
+            user = Users.query.get(seller.user_uuid)
+            if user and user.role == Role.SELLER:
+                user.role = Role.USER"""
+            
+            # Delete only the seller record
+            db.session.delete(seller)
+            db.session.commit()
+            
+            # Send rejection email after successful deletion
+            send_seller_rejection_email(business_email, business_owner)
+            
+            return jsonify({
+                "message": "Seller application rejected and seller profile removed",
+                "user_preserved": True
+            })
+            
+        else:  # For Approved or Pending status
+            # Update seller status with admin info
+            seller.update_status(new_status, current_user, admin_notes)
+            
+            # If status is Approved, update user role to Seller
+            if new_status == 'Approved':
+                user = Users.query.get(seller.user_uuid)
+                if user:
+                    user.role = Role.SELLER
+                    # Send email notification to seller
+                    send_seller_approval_email(seller.business_email, seller.business_owner)
+            
+            db.session.commit()
+            return jsonify({
+                "message": f"Seller status updated to {new_status}",
+                "role_updated": new_status == 'Approved'
+            })
+       
     except Exception as e:
         db.session.rollback()
         return jsonify({

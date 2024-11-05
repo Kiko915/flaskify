@@ -53,7 +53,7 @@ export default function SellerRegister() {
     };
 
       fetchStatus();
-    }, [user, registrationStatus])
+    }, [user, registrationStatus]);
 
 
   const handleInputChange = async (e) => {
@@ -191,16 +191,29 @@ export default function SellerRegister() {
                 <>
                 {confettiActive && <Confetti width={width} height={height} numberOfPieces={500} recycle={false} />}
                 <div className="my-8">
-                  <UserCheck className="text-green-600 w-28 h-28 mx-auto" />
+                  <UserCheck className="text-green-600 w-28 h-28 mx-auto motion-preset-confetti" />
                   <h4 className="text-xl font-bold my-4">Already a Seller!</h4>
                   <p className="text-green-600 bg-green-100 p-4 rounded-md">
                     Congratulations! You are approved as a seller on Flaskify.
                   </p>
-                  <Button asChild className="w-full bg-yellow-500 hover:bg-yellow-600 font-bold my-4">
+                  <Button asChild className="w-full bg-yellow-500 hover:bg-yellow-600 text-center font-bold my-4 hover:motion-preset-confetti">
                     <Link to="/seller/seller-center" replace>Seller Dashboard</Link>
                   </Button>
                 </div>
                 </>
+              )}
+
+              {registrationStatus === "Rejected" && (
+                <div className="my-8">
+                  <MailCheckIcon className="text-red-600 w-28 h-28 mx-auto" />
+                  <h4 className="text-xl font-bold my-4">Registration Rejected</h4>
+                  <p className="mb-6 text-red-600 bg-red-100 p-4 rounded-md">
+                    Your registration has been rejected. Please contact support for more information.
+                  </p>
+                  <Button className="w-full bg-yellow-500 hover:bg-yellow-600 font-bold my-4" onClick={() => setRegistrationStatus(null)}>
+                    Reapply
+                  </Button>
+                </div>
               )}
 
               {successMessage && (

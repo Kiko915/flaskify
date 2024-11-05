@@ -1,8 +1,9 @@
+import ConstructionPage from "@/components/misc/ConstructionPage"
 
 
 function SellerDashboard() {
   return (
-    <div>SellerDashboard</div>
+    <ConstructionPage />
   )
 }
 

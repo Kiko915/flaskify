@@ -1,8 +1,9 @@
+import ConstructionPage from "@/components/misc/ConstructionPage";
+
 export default function Home() {
     return (
         <div>
-            <h1>Home</h1>
-            <p>Welcome to the home page!</p>
+            <ConstructionPage />
         </div>
     );
 }
