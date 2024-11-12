@@ -28,8 +28,6 @@ import {
 import { useAuth } from "@/utils/AuthContext"
 import { Link } from "react-router-dom"
 
-// This is sample data.
-
 
 export function AppSidebar({
   ...props

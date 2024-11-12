@@ -1,15 +1,20 @@
+import { SellerSidebar } from "@/components/seller-sidebar"
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { Outlet } from "react-router-dom"
 
 
 const SellerCenter = () => {
     return (
         <>
-        <div>
-            <h1>Seller Center</h1>
-        </div>
-        <section id="seller-center-layout rbac-23c789">
-            <Outlet />
-        </section>
+        <SidebarProvider>
+            <div>
+                <SellerSidebar />
+            </div>
+            <section id="seller-center-layout rbac-23c789">
+                <SidebarTrigger />
+                <Outlet />
+            </section>
+        </SidebarProvider>
         </>
     )
 }
