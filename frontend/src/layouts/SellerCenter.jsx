@@ -10,9 +10,11 @@ const SellerCenter = () => {
             <div>
                 <SellerSidebar />
             </div>
-            <section id="seller-center-layout rbac-23c789">
+            <section id="seller-center-layout rbac-23c789" className="w-full bg-gray-50">
                 <SidebarTrigger />
-                <Outlet />
+                <div className="seller-center-outlet container p-8">
+                    <Outlet />
+                </div>
             </section>
         </SidebarProvider>
         </>

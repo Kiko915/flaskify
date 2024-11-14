@@ -142,7 +142,7 @@ export function AppSidebar({
     ],
     projects: [
       {
-        name: "Design Engineering",
+        name: "Settings",
         url: "#",
         icon: Frame,
       },
@@ -150,12 +150,7 @@ export function AppSidebar({
         name: "Sales & Marketing",
         url: "#",
         icon: PieChart,
-      },
-      {
-        name: "Travel",
-        url: "#",
-        icon: Map,
-      },
+      }
     ],
   }
 

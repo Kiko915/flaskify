@@ -34,6 +34,7 @@ import SellerManagement from './pages/admin/seller-management/SellerManagement.j
 import SellerVerifications from './pages/admin/seller-management/SellerVerifications.jsx';
 import SellerCenter from './layouts/SellerCenter.jsx';
 import SellerDashboard from './pages/seller/seller-center/SellerDashboard.jsx';
+import Listings from './pages/seller/seller-center/products/Listings.jsx';
 
 const router = createBrowserRouter([
   {
@@ -127,6 +128,15 @@ const router = createBrowserRouter([
               {
                 index: true,
                 element: <SellerDashboard />
+              },
+              {
+                path: "products",
+                children: [
+                  {
+                    path: "listings",
+                    element: <Listings />
+                  }
+                ]
               }
             ]
           }

@@ -152,7 +152,8 @@ const StepVerifyEmail = ({ formData, handleChange }) => {
       )}
 
       {isCodeSent ? (
-        <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center flex-col justify-between mt-4">
+          <span>Verification code sent to your email, The code will expire in 10mins.</span>
           <button
             type="button"
             onClick={sendVerificationCode}

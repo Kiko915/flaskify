@@ -5,7 +5,7 @@ import StepOne from "../../components/auth/S1";
 import StepTwo from "../../components/auth/S2";
 import StepThree from "../../components/auth/S3";
 import "./step.css";
-import { ArrowLeft, ArrowRight, Check, InfoIcon, MapPin, Phone, Send } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, InfoIcon, Mail, MapPin, Phone, Send } from "lucide-react";
 import toast from "react-hot-toast"
 import StepVerifyEmail from "../../components/auth/emailVerify";
 
@@ -236,7 +236,7 @@ const SignUp = () => {
         <div className="line"></div>
         <div className={`step ${step === 2 ? "active" : ""}`}><MapPin /></div>
         <div className="line"></div>
-        <div className={`step ${step === 3 ? "active" : ""}`}><Phone /></div>
+        <div className={`step ${step === 3 ? "active" : ""}`}><Mail /></div>
         <div className="line"></div>
         <div className={`step ${step === 4 ? "active" : ""}`}><Check /></div>
       </div>

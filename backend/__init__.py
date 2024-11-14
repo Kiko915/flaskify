@@ -3,11 +3,10 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_mail import Mail
 from flask_cors import CORS
 from flask_migrate import Migrate
-from flask_login import LoginManager
+from flask_login import LoginManager, UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import uuid
-from flask_login import UserMixin
 from sqlalchemy.orm import validates, relationship
 from itsdangerous import URLSafeTimedSerializer, SignatureExpired
 from enum import Enum

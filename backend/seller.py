@@ -264,3 +264,22 @@ def update_seller_status(seller_id):
             "error": "Failed to update seller status",
             "details": str(e)
         }), 500
+    
+
+# Add a new route to get all the shops of a seller by seller_id
+@seller.route('/seller/<string:seller_id>/shops', methods=['GET'])
+@login_required
+@role_required([Role.ADMIN, Role.SELLER])
+def get_seller_shops(seller_id):
+    seller = SellerInfo.query.get(seller_id)
+    if not seller or seller.user_uuid != current_user.user_uuid:
+        return jsonify({"error": "Seller not found or access denied"}), 404
+
+    shops = Shop.query.filter_by(seller_id=seller_id).all()
+    return jsonify([{
+        "shop_id": shop.shop_id,
+        "shop_name": shop.shop_name,
+        "shop_description": shop.shop_description,
+        "shop_logo": shop.shop_logo
+    } for shop in shops])
+

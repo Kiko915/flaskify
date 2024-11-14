@@ -1,6 +1,7 @@
 import {
     BookOpen,
     Bot,
+    Cog,
     Frame,
     HandCoins,
     LayoutDashboard,
@@ -87,7 +88,7 @@ import {
           items: [
             {
               title: "Product Listings",
-              url: "#",
+              url: "/seller/seller-center/products/listings",
             },
             {
               title: "Archived Products",
@@ -175,19 +176,14 @@ import {
       ],
       projects: [
         {
-          name: "Design Engineering",
+          name: "Settings",
           url: "#",
-          icon: Frame,
+          icon: Cog,
         },
         {
           name: "Sales & Marketing",
           url: "#",
           icon: PieChart,
-        },
-        {
-          name: "Travel",
-          url: "#",
-          icon: Map,
         },
       ],
     }
@@ -213,6 +209,7 @@ import {
           </SidebarMenuItem>
           </SidebarMenu>
           <NavMain items={data.navMain} />
+          <NavProjects projects={data.projects} />
         </SidebarContent>
         <SidebarFooter>
           <NavUser user={data.user} />
