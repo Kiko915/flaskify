@@ -1,7 +1,8 @@
 import GreetingTab from "@/components/misc/GreetingTab"
+import NewSellerGuide from "@/components/seller/NewSellerActions";
 import { useAuth } from "@/utils/AuthContext"
 import { DollarSign, Package, ShoppingCart, Users } from "lucide-react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createSwapy } from "swapy";
 
 const StatCard = ({ title, value, icon: Icon, trend, color, slotId }) => (
@@ -137,6 +138,9 @@ function SellerDashboard() {
             <SalesChart />
             </div>
           </div>
+        </div>
+        <div className="my-6 motion-preset-slide-up-lg">
+        <NewSellerGuide />
         </div>
         </div>
       </div>
