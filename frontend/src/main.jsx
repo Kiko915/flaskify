@@ -35,6 +35,10 @@ import SellerVerifications from './pages/admin/seller-management/SellerVerificat
 import SellerCenter from './layouts/SellerCenter.jsx';
 import SellerDashboard from './pages/seller/seller-center/SellerDashboard.jsx';
 import Listings from './pages/seller/seller-center/products/Listings.jsx';
+import ShopInfo from './pages/seller/seller-center/shop/ShopInfo.jsx';
+import NewShop from './pages/seller/seller-center/shop/NewShop.jsx';
+import EditShop from './pages/seller/seller-center/shop/EditShop.jsx';
+import ShopDetail from './pages/seller/seller-center/shop/ShopDetail.jsx';
 
 const router = createBrowserRouter([
   {
@@ -135,6 +139,27 @@ const router = createBrowserRouter([
                   {
                     path: "listings",
                     element: <Listings />
+                  }
+                ]
+              },
+              {
+                path: "shop",
+                children: [
+                  {
+                    path: "info",
+                    element: <ShopInfo />
+                  },
+                  {
+                    path: "new",
+                    element: <NewShop />
+                  },
+                  {
+                    path: "edit/:shopId",
+                    element: <EditShop />
+                  },
+                  {
+                    path: ":shopUuid/detail",
+                    element: <ShopDetail />
                   }
                 ]
               }

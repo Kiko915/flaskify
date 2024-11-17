@@ -1,4 +1,4 @@
-import { Clipboard, Settings, Store, Camera, DollarSign, Star } from 'lucide-react'
+import { Clipboard, Settings, Store, Camera, DollarSign, Star, Package, User, User2 } from 'lucide-react'
 import { Card, CardContent, CardFooter } from "@/components/ui/card"
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
@@ -7,9 +7,9 @@ export default function NewSellerGuide() {
     const [isGuideCompleted, setIsGuideCompleted] = useState(localStorage.getItem('newSellerGuideCompleted') === 'true')
 
   const steps = [
-    { icon: Settings, text: "Customize profile", href: "#" },
-    { icon: Store, text: "Create store", href: "/seller/seller-center/products/listings" },
-    { icon: Camera, text: "Add photos", href: "#" },
+    { icon: User2, text: "Customize profile", href: "/user/account" },
+    { icon: Store, text: "Create store", href: "/seller/seller-center/shop/info" },
+    { icon: Package, text: "Add products", href: "/seller/seller-center/products/listings" },
   ]
 
   const handleDone = () => {

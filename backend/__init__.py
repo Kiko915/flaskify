@@ -185,8 +185,6 @@ class Address(db.Model):
     def __repr__(self):
         return f'<Address {self.address_name} for {self.recipient_name}>'
 
-
-
 class PaymentMethod(db.Model):
     __tablename__ = 'payment_methods'
 
@@ -213,7 +211,7 @@ class PaymentMethod(db.Model):
 
     def __repr__(self):
         return f'<PaymentMethod {self.id}>'
-    
+
 # Seller Model
 class SellerInfo(db.Model):
     __tablename__ = 'seller_info'
@@ -318,20 +316,23 @@ class Shop(db.Model):
     date_created = db.Column(db.DateTime, default=datetime.now)
     last_updated = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
     
+    # Archival status
+    is_archived = db.Column(db.Boolean, default=False)
+    archived_at = db.Column(db.DateTime, nullable=True)
+    
     # Relationships
     seller = db.relationship('SellerInfo', back_populates='shops')
     
     def __repr__(self):
         return f'<Shop {self.business_name}>'
-    
-    @property
+        
     def is_active(self):
         """
-        Check if shop's seller is approved
+        Check if shop's seller is approved and shop is not archived
         
         :return: Boolean indicating if shop can operate
         """
-        return self.seller.is_approved()
+        return self.seller.is_approved() and not self.is_archived
 
 
 class AdminInfo(db.Model):
@@ -388,4 +389,3 @@ def create_app():
     app.register_blueprint(seller)
 
     return app
-

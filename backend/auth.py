@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from __init__ import db, mail, OTP, Users
+from __init__ import db, mail, OTP, Users, SellerInfo
 from flask_mail import Message
 import random
 import string
@@ -247,4 +247,24 @@ def get_current_user():
         'date_of_birth': current_user.date_of_birth.isoformat() if current_user.date_of_birth else None,
         'profile_image_url': current_user.profile_image_url,
     }
+
+    # Add seller information if user is a seller
+    if current_user.role == 'Seller':
+        seller_info = SellerInfo.query.filter_by(user_uuid=current_user.user_uuid).first()
+        if seller_info:
+            user_data['seller'] = {
+                'seller_id': seller_info.seller_id,
+                'business_type': seller_info.business_type,
+                'business_owner': seller_info.business_owner,
+                'business_email': seller_info.business_email,
+                'business_phone': seller_info.business_phone,
+                'status': seller_info.status,
+                'total_sales': float(seller_info.total_sales) if seller_info.total_sales else 0.00,
+                'date_registered': seller_info.date_registered.isoformat(),
+                'last_updated': seller_info.last_updated.isoformat(),
+                'is_approved': seller_info.is_approved()
+            }
+        else:
+            user_data['seller'] = None
+
     return jsonify(user_data), 200

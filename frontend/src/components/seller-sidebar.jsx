@@ -112,7 +112,7 @@ import {
           items: [
             {
               title: "Shop Information",
-              url: "/admin/sellers",
+              url: "/seller/seller-center/shop/info",
             },
             {
               title: "Shop Decorations",
