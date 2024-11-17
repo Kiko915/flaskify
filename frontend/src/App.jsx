@@ -4,6 +4,7 @@ import Loader from './components/Loader';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import { Helmet } from 'react-helmet-async';
+import CountdownTimer from './components/CountdownTimer';
 
 const AppLayout = () => {
   const [loading, setLoading] = useState(false);
@@ -37,6 +38,7 @@ const AppLayout = () => {
       <Helmet>
         <title>Flaskify | Tech powered marketplace.</title>
       </Helmet>
+      <CountdownTimer />
       {/* Show header except for auth routes */}
       {!isAuthRoute && !isSellerRegisterRoute && !isAdminRoute && !isSellerCenter && <Header />}
       

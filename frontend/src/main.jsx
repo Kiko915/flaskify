@@ -39,6 +39,8 @@ import ShopInfo from './pages/seller/seller-center/shop/ShopInfo.jsx';
 import NewShop from './pages/seller/seller-center/shop/NewShop.jsx';
 import EditShop from './pages/seller/seller-center/shop/EditShop.jsx';
 import ShopDetail from './pages/seller/seller-center/shop/ShopDetail.jsx';
+import Dashboard from "./pages/admin/dashboard/Dashboard";
+import UsersPage from './pages/admin/users/UsersPage';
 
 const router = createBrowserRouter([
   {
@@ -174,7 +176,11 @@ const router = createBrowserRouter([
         children: [
           {
             path: "dashboard",
-            element: <div>Dashboard Page</div>
+            element: <Dashboard />
+          },
+          {
+            path: "users",
+            element: <UsersPage />
           },
           {
             path: "sellers",

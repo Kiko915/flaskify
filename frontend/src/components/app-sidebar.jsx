@@ -57,63 +57,82 @@ export function AppSidebar({
         icon: ShoppingBag,
         items: [
           {
-            title: "History",
-            url: "#",
+            title: "All Products",
+            url: "/admin/products",
           },
           {
-            title: "Starred",
-            url: "#",
+            title: "Product Categories",
+            url: "/admin/products/categories",
           },
           {
-            title: "Settings",
-            url: "#",
-          },
+            title: "Product Reviews",
+            url: "/admin/products/reviews",
+          }
         ],
       },
       {
-        title: "Seller",
+        title: "Seller Management",
         url: "#",
         icon: UserRound,
         items: [
           {
-            title: "Seller Management",
+            title: "All Sellers",
             url: "/admin/sellers",
+          },
+          {
+            title: "Pending Approvals",
+            url: "/admin/sellers/pending",
           },
           {
             title: "Seller Verification",
             url: "/admin/sellers/verification",
           },
           {
-            title: "Seller Payouts",
-            url: "#",
-          },
-          {
-            title: "Seller Analytics",
-            url: "#",
+            title: "Shop Management",
+            url: "/admin/shops",
           }
         ],
       },
       {
-        title: "Documentation",
+        title: "Orders & Payments",
         url: "#",
-        icon: BookOpen,
+        icon: ShoppingBag,
         items: [
           {
-            title: "Introduction",
-            url: "#",
+            title: "All Orders",
+            url: "/admin/orders",
           },
           {
-            title: "Get Started",
-            url: "#",
+            title: "Pending Orders",
+            url: "/admin/orders/pending",
           },
           {
-            title: "Tutorials",
-            url: "#",
+            title: "Payment Transactions",
+            url: "/admin/payments",
           },
           {
-            title: "Changelog",
-            url: "#",
+            title: "Seller Payouts",
+            url: "/admin/payments/payouts",
+          }
+        ],
+      },
+      {
+        title: "User Management",
+        url: "#",
+        icon: UserRound,
+        items: [
+          {
+            title: "All Users",
+            url: "/admin/users",
           },
+          {
+            title: "User Roles",
+            url: "/admin/users/roles",
+          },
+          {
+            title: "User Analytics",
+            url: "/admin/users/analytics",
+          }
         ],
       },
       {
@@ -122,34 +141,30 @@ export function AppSidebar({
         icon: Settings2,
         items: [
           {
-            title: "General",
-            url: "#",
+            title: "General Settings",
+            url: "/admin/settings",
           },
           {
-            title: "Team",
-            url: "#",
+            title: "Platform Settings",
+            url: "/admin/settings/platform",
           },
           {
-            title: "Billing",
-            url: "#",
-          },
-          {
-            title: "Limits",
-            url: "#",
-          },
+            title: "Security Settings",
+            url: "/admin/settings/security",
+          }
         ],
       },
     ],
     projects: [
       {
-        name: "Settings",
-        url: "#",
-        icon: Frame,
+        name: "Analytics",
+        url: "/admin/analytics",
+        icon: PieChart,
       },
       {
-        name: "Sales & Marketing",
-        url: "#",
-        icon: PieChart,
+        name: "Reports",
+        url: "/admin/reports",
+        icon: Frame,
       }
     ],
   }

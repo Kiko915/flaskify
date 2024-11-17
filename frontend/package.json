@@ -41,6 +41,7 @@
     "react-select": "^5.8.1",
     "react-select-country-list": "^2.2.3",
     "react-use": "^17.5.1",
+    "recharts": "^2.13.3",
     "swapy": "^0.4.2",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",

@@ -74,9 +74,9 @@ export default function ShopDetail() {
             <Card className="mb-8 p-6">
                 <div className="flex flex-col md:flex-row gap-6">
                     <div className="w-32 h-32 bg-gray-200 rounded-lg flex items-center justify-center">
-                        {shop.business_registration_doc ? (
+                        {shop.shop_logo ? (
                             <img 
-                                src={shop.business_registration_doc} 
+                                src={shop.shop_logo} 
                                 alt={shop.business_name} 
                                 className="w-full h-full object-cover rounded-lg"
                             />

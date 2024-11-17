@@ -16,9 +16,29 @@ const AbstractPattern = ({ className }) => (
   </div>
 );
 
-function GreetingTab({ username }) {
+function GreetingTab({ username, role = 'user' }) {
     const state = useNetworkState();
     console.log(state);
+
+  const getRoleBadgeConfig = (role) => {
+    switch (role.toLowerCase()) {
+      case 'admin':
+        return {
+          text: 'Admin Account',
+          bgColor: 'bg-red-500'
+        };
+      case 'seller':
+        return {
+          text: 'Seller Account',
+          bgColor: 'bg-yellow-500'
+        };
+      default:
+        return {
+          text: 'User Account',
+          bgColor: 'bg-blue-500'
+        };
+    }
+  };
 
   const getGreetingConfig = () => {
     const hour = new Date().getHours();
@@ -72,9 +92,11 @@ function GreetingTab({ username }) {
             <h2 className={`${textColor} text-2xl font-bold tracking-tight`}>
               {text}, <span>{username}</span>!
             </h2>
-            {/** Role Badge as Seller */}
+            {/** Dynamic Role Badge */}
             <div className="flex items-center gap-2">
-              <span className="text-xs bg-yellow-500 text-white font-medium rounded-full px-2 py-1">Seller Account</span>
+              <span className={`text-xs ${getRoleBadgeConfig(role).bgColor} text-white font-medium rounded-full px-2 py-1`}>
+                {getRoleBadgeConfig(role).text}
+              </span>
             </div>
           </div>
           

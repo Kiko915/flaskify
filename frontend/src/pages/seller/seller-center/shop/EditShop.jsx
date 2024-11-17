@@ -4,7 +4,7 @@ import { useAuth } from "@/utils/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Store, Upload } from 'lucide-react';
+import { Store, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function EditShop() {
@@ -19,8 +19,12 @@ export default function EditShop() {
         business_province: '',
         business_city: '',
         business_address: '',
-        business_registration_doc: null
+        shop_logo: null
     });
+    const [previewUrl, setPreviewUrl] = useState(null);
+    const [selectedFile, setSelectedFile] = useState(null);
+    const [removeLogoFlag, setRemoveLogoFlag] = useState(false);
+    const [existingLogoUrl, setExistingLogoUrl] = useState(null);
 
     useEffect(() => {
         if (!user?.seller?.seller_id) {
@@ -52,8 +56,10 @@ export default function EditShop() {
                     business_province: shop.business_province,
                     business_city: shop.business_city,
                     business_address: shop.business_address,
-                    business_registration_doc: null
+                    shop_logo: null
                 });
+                setExistingLogoUrl(shop.shop_logo);
+                setPreviewUrl(shop.shop_logo || null);
                 setLoading(false);
             } catch (err) {
                 setError(err.message);
@@ -65,23 +71,61 @@ export default function EditShop() {
     }, [user, shopId, navigate]);
 
     const handleInputChange = (e) => {
-        const { name, value, files } = e.target;
-        if (name === 'business_registration_doc') {
-            setFormData(prev => ({
-                ...prev,
-                [name]: files[0]
-            }));
-        } else {
-            setFormData(prev => ({
-                ...prev,
-                [name]: value
-            }));
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleFileChange = (e) => {
+        const file = e.target.files[0];
+        
+        // Check file type
+        const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+        if (!validTypes.includes(file?.type)) {
+            toast.error('Please upload only JPG, JPEG, or PNG images for shop logo');
+            e.target.value = '';
+            return;
         }
+
+        // Check file size (5MB = 5 * 1024 * 1024 bytes)
+        const maxSize = 5 * 1024 * 1024;
+        if (file?.size > maxSize) {
+            toast.error('Shop logo file size must be less than 5MB');
+            e.target.value = '';
+            return;
+        }
+
+        setSelectedFile(file);
+        setFormData(prev => ({
+            ...prev,
+            shop_logo: file
+        }));
+
+        // Create preview URL
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+    };
+
+    const removeImage = () => {
+        setFormData(prev => ({
+            ...prev,
+            shop_logo: null
+        }));
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+        }
+        setExistingLogoUrl(null);
+        setSelectedFile(null);
+        setRemoveLogoFlag(true);
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setError(null);
 
         try {
             const form = new FormData();
@@ -90,6 +134,12 @@ export default function EditShop() {
                     form.append(key, formData[key]);
                 }
             });
+
+            if (selectedFile) {
+                form.append('shop_logo', selectedFile);
+            } else if (removeLogoFlag) {
+                form.append('remove_logo', 'true');
+            }
 
             const response = await fetch(
                 `http://localhost:5555/seller/${user.seller.seller_id}/shops/${shopId}`,
@@ -103,14 +153,25 @@ export default function EditShop() {
             const data = await response.json();
             
             if (!response.ok) {
-                throw new Error(data.error || 'Failed to update shop');
+                if (data.error === 'Invalid shop logo image') {
+                    toast.error(data.details || 'Invalid shop logo image');
+                    setError(data.details || 'Invalid shop logo image');
+                } else {
+                    toast.error(data.error || 'Failed to update shop');
+                    setError(data.error || 'Failed to update shop');
+                }
+                return;
             }
 
-            toast.success('Shop updated successfully');
-            navigate('/seller/seller-center/shop/info');
+            // Only navigate if there are no errors
+            if (!error) {
+                toast.success('Shop updated successfully');
+                navigate('/seller/seller-center/shop/info');
+            }
         } catch (err) {
-            toast.error(err.message);
-            setError(err.message);
+            console.error('Error:', err);
+            toast.error('An error occurred while updating the shop');
+            setError('An error occurred while updating the shop');
         } finally {
             setLoading(false);
         }
@@ -201,40 +262,76 @@ export default function EditShop() {
                         />
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium mb-1">
-                            Business Registration Document (Optional)
-                        </label>
-                        <div className="flex items-center gap-2">
-                            <Input
-                                type="file"
-                                name="business_registration_doc"
-                                onChange={handleInputChange}
-                                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                className="flex-1"
-                            />
-                            <Upload className="w-5 h-5 text-gray-400" />
+                    <div className="space-y-2">
+                        <label className="block text-sm font-medium mb-1">Shop Logo</label>
+                        <div className="flex flex-col items-start space-y-4">
+                            {previewUrl && (
+                                <div className="relative">
+                                    <img 
+                                        src={previewUrl} 
+                                        alt="Shop Logo Preview" 
+                                        className="w-32 h-32 object-cover rounded-lg"
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="sm"
+                                        className="absolute top-0 right-0 -mt-2 -mr-2"
+                                        onClick={removeImage}
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            )}
+                            <div className="flex items-center space-x-4">
+                                <Input
+                                    type="file"
+                                    accept="image/jpeg,image/png"
+                                    onChange={handleFileChange}
+                                    className={previewUrl ? "hidden" : ""}
+                                />
+                                {previewUrl && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => {
+                                            const fileInput = document.createElement('input');
+                                            fileInput.type = 'file';
+                                            fileInput.accept = 'image/jpeg,image/png';
+                                            fileInput.onchange = handleFileChange;
+                                            fileInput.click();
+                                        }}
+                                    >
+                                        Change Logo
+                                    </Button>
+                                )}
+                            </div>
+                            <p className="text-sm text-gray-500">
+                                Supported formats: JPG, JPEG, PNG. Maximum size: 5MB. Minimum dimensions: 150x150 pixels.
+                            </p>
                         </div>
-                        <p className="text-sm text-gray-500 mt-1">
-                            Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG
-                        </p>
                     </div>
 
-                    <div className="flex gap-4 pt-4">
-                        <Button
-                            type="submit"
-                            disabled={loading}
-                            className="flex-1 bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:from-yellow-500 hover:to-orange-600"
-                        >
-                            {loading ? 'Updating...' : 'Update Shop'}
-                        </Button>
+                    <div className="flex justify-end space-x-4 pt-4">
                         <Button
                             type="button"
                             variant="outline"
                             onClick={() => navigate('/seller/seller-center/shop/info')}
-                            className="flex-1"
                         >
                             Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={loading}
+                        >
+                            {loading ? (
+                                <div className="flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                    Updating Shop...
+                                </div>
+                            ) : (
+                                'Update Shop'
+                            )}
                         </Button>
                     </div>
                 </form>

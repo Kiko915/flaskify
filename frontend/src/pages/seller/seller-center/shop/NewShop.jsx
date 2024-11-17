@@ -4,7 +4,7 @@ import { useAuth } from "@/utils/AuthContext";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Store, Upload } from 'lucide-react';
+import { Store, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function NewShop() {
@@ -18,12 +18,9 @@ export default function NewShop() {
         business_province: '',
         business_city: '',
         business_address: '',
-        business_registration_doc: null
+        shop_logo: null
     });
-    const [ocrValidation, setOcrValidation] = useState({
-        isValidating: false,
-        error: null
-    });
+    const [previewUrl, setPreviewUrl] = useState(null);
 
     const handleInputChange = (e) => {
         const { name, value } = e.target;
@@ -39,7 +36,7 @@ export default function NewShop() {
         // Check file type
         const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
         if (!validTypes.includes(file?.type)) {
-            toast.error('Please upload only JPG, JPEG, or PNG images');
+            toast.error('Please upload only JPG, JPEG, or PNG images for shop logo');
             e.target.value = '';
             return;
         }
@@ -47,21 +44,36 @@ export default function NewShop() {
         // Check file size (5MB = 5 * 1024 * 1024 bytes)
         const maxSize = 5 * 1024 * 1024;
         if (file?.size > maxSize) {
-            toast.error('File size must be less than 5MB');
+            toast.error('Shop logo file size must be less than 5MB');
             e.target.value = '';
             return;
         }
 
         setFormData(prev => ({
             ...prev,
-            business_registration_doc: file
+            shop_logo: file
         }));
+
+        // Create preview URL
+        const url = URL.createObjectURL(file);
+        setPreviewUrl(url);
+    };
+
+    const removeImage = () => {
+        setFormData(prev => ({
+            ...prev,
+            shop_logo: null
+        }));
+        if (previewUrl) {
+            URL.revokeObjectURL(previewUrl);
+            setPreviewUrl(null);
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
-        setOcrValidation({ isValidating: true, error: null });
+        setError(null);
 
         try {
             if (!user?.seller?.seller_id) {
@@ -84,27 +96,27 @@ export default function NewShop() {
             const data = await response.json();
 
             if (!response.ok) {
-                if (data.error === 'Invalid BIR certificate') {
-                    setOcrValidation({
-                        isValidating: false,
-                        error: data.details || 'BIR certificate validation failed'
-                    });
-                    toast.error(data.details || 'BIR certificate validation failed');
+                if (data.error === 'Invalid shop logo image') {
+                    toast.error(data.details || 'Invalid shop logo image');
+                    setError(data.details || 'Invalid shop logo image');
                 } else {
                     toast.error(data.error || 'Failed to create shop');
+                    setError(data.error || 'Failed to create shop');
                 }
-                setLoading(false);
                 return;
             }
 
-            toast.success('Shop created successfully!');
-            navigate('/seller/seller-center/shop/info');
+            // Only navigate if there are no errors
+            if (!error) {
+                toast.success('Shop created successfully!');
+                navigate('/seller/seller-center/shop/info');
+            }
         } catch (error) {
             console.error('Error:', error);
             toast.error('An error occurred while creating the shop');
+            setError('An error occurred while creating the shop');
         } finally {
             setLoading(false);
-            setOcrValidation({ isValidating: false, error: null });
         }
     };
 
@@ -208,52 +220,65 @@ export default function NewShop() {
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                            BIR Certificate (Required)
+                            Shop Logo
                         </label>
-                        <div className="mt-1 flex items-center">
-                            <label className="cursor-pointer">
-                                <Input
-                                    type="file"
-                                    className="hidden"
-                                    onChange={handleFileChange}
-                                    accept="image/jpeg,image/jpg,image/png"
-                                    required
-                                />
-                                <div className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50">
-                                    <Upload className="w-5 h-5 text-gray-500" />
-                                    <span className="text-sm text-gray-600">Upload Document</span>
+                        <div className="mt-1 flex items-center gap-4">
+                            {previewUrl ? (
+                                <div className="relative">
+                                    <img
+                                        src={previewUrl}
+                                        alt="Shop Logo Preview"
+                                        className="w-32 h-32 object-cover rounded-lg border border-gray-200"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={removeImage}
+                                        className="absolute -top-2 -right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </button>
                                 </div>
-                            </label>
-                            {formData.business_registration_doc && (
-                                <span className="ml-3 text-sm text-gray-500">
-                                    {formData.business_registration_doc.name}
-                                </span>
+                            ) : (
+                                <div className="flex items-center justify-center w-32 h-32 border-2 border-dashed border-gray-300 rounded-lg">
+                                    <div className="text-center">
+                                        <Upload className="mx-auto h-8 w-8 text-gray-400" />
+                                        <div className="mt-1 text-xs text-gray-500">Upload Logo</div>
+                                    </div>
+                                </div>
                             )}
+                            <Input
+                                type="file"
+                                name="shop_logo"
+                                onChange={handleFileChange}
+                                accept="image/jpeg,image/jpg,image/png"
+                                className="max-w-[200px]"
+                            />
                         </div>
-                        {ocrValidation.error && (
-                            <p className="text-red-500 text-xs italic mt-1">
-                                {ocrValidation.error}
-                            </p>
-                        )}
-                        <p className="text-gray-500 text-xs mt-1">
-                            Max file size: 5MB. Supported formats: JPG, JPEG, PNG
-                        </p>
+                        <div className="mt-1 text-sm">
+                            <p className="text-gray-500">Requirements:</p>
+                            <ul className="list-disc list-inside text-gray-500 text-xs space-y-1">
+                                <li>File types: JPG, JPEG, or PNG</li>
+                                <li>Maximum file size: 5MB</li>
+                                <li>Minimum dimensions: 150x150 pixels</li>
+                            </ul>
+                            {error && <p className="text-red-500 mt-1">{error}</p>}
+                        </div>
                     </div>
 
-                    <div className="flex justify-end space-x-4 mt-6">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => navigate('/seller/seller-center/shop/info')}
-                        >
-                            Cancel
-                        </Button>
+                    <div className="pt-4">
                         <Button
                             type="submit"
-                            className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:from-yellow-500 hover:to-orange-600"
+                            className="w-full"
                             disabled={loading}
                         >
-                            {loading ? 'Creating...' : 'Create Shop'}
+                            {loading ? (
+                                <div className="flex items-center justify-center">
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                                    Creating Shop...
+                                </div>
+                            ) : (
+                                'Create Shop'
+                            )}
                         </Button>
                     </div>
                 </form>
