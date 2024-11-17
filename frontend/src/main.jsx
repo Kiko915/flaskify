@@ -41,6 +41,7 @@ import EditShop from './pages/seller/seller-center/shop/EditShop.jsx';
 import ShopDetail from './pages/seller/seller-center/shop/ShopDetail.jsx';
 import Dashboard from "./pages/admin/dashboard/Dashboard";
 import UsersPage from './pages/admin/users/UsersPage';
+import SellersPage from './pages/admin/sellers/SellersPage.jsx';
 
 const router = createBrowserRouter([
   {
@@ -184,12 +185,12 @@ const router = createBrowserRouter([
           },
           {
             path: "sellers",
-            element: <SellerManagement />
+            element: <SellersPage />
           },
           {
             path: "sellers/verification",
             element: <SellerVerifications />
-          }
+          },
         ]
       }
     ]
