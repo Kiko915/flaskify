@@ -15,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,7 +41,9 @@ export default function SellersPage() {
 
   const fetchSellers = async () => {
     try {
-      const response = await fetch("/api/sellers");
+      const response = await fetch("http://localhost:5555/api/sellers", {
+        credentials: "include",
+      });
       if (!response.ok) {
         throw new Error("Failed to fetch sellers");
       }
@@ -52,30 +53,6 @@ export default function SellersPage() {
       toast.error("Failed to fetch sellers");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateSellerStatus = async (sellerId, newStatus, remarks = "") => {
-    try {
-      const response = await fetch(`/api/admin/seller/${sellerId}/status`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          status: newStatus,
-          remarks,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to update seller status");
-      }
-
-      toast.success(`Seller status updated to ${newStatus}`);
-      fetchSellers(); // Refresh the list
-    } catch (error) {
-      toast.error("Failed to update seller status");
     }
   };
 
@@ -142,7 +119,6 @@ export default function SellersPage() {
                   <TableHead>Tax ID</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Registration Date</TableHead>
-                  <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -155,7 +131,10 @@ export default function SellersPage() {
                     <TableCell>
                       <div className="flex items-center gap-3">
                         <Avatar>
-                          <AvatarImage src={seller.bir_certificate} />
+                          <AvatarImage 
+                            src={seller.profile_image_url} 
+                            alt={seller.business_owner} 
+                          />
                           <AvatarFallback>
                             {getInitials(seller.business_owner)}
                           </AvatarFallback>
@@ -182,32 +161,6 @@ export default function SellersPage() {
                     <TableCell>
                       {new Date(seller.submission_date).toLocaleDateString()}
                     </TableCell>
-                    <TableCell>
-                      {seller.status === "Pending" && (
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateSellerStatus(seller.id, "Approved");
-                            }}
-                            className="bg-green-500 hover:bg-green-600"
-                          >
-                            Approve
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              updateSellerStatus(seller.id, "Rejected");
-                            }}
-                          >
-                            Reject
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -220,7 +173,6 @@ export default function SellersPage() {
         seller={selectedSeller}
         isOpen={!!selectedSeller}
         onClose={() => setSelectedSeller(null)}
-        onStatusUpdate={fetchSellers}
       />
     </>
   );

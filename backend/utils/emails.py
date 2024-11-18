@@ -1,6 +1,6 @@
 from flask import render_template
 from flask_mail import Message
-from __init__ import mail
+from models import mail
 
 
 def send_welcome_email(user_email, user_name):
@@ -36,4 +36,27 @@ def send_seller_rejection_email(email, user_name):
                   sender='francismistica06@gmail.com',
                     recipients=[email])
     msg.html = render_template('seller-rejection-notification.html', user_name=user_name)
+    mail.send(msg)
+
+
+def send_seller_suspension_email(email, user_name, remarks, violation_type):
+    violation_types = {
+        'counterfeit': 'Selling Counterfeit Products',
+        'misrepresentation': 'Product Misrepresentation',
+        'shipping': 'Shipping Violations',
+        'customer_service': 'Poor Customer Service',
+        'policy': 'Policy Violations',
+        'fraud': 'Fraudulent Activity',
+        'other': 'Other Violations'
+    }
+    
+    formatted_violation = violation_types.get(violation_type, 'Policy Violation')
+    
+    msg = Message('Your Seller Account has been Suspended', 
+                  sender='francismistica06@gmail.com',
+                  recipients=[email])
+    msg.html = render_template('seller-suspension-notification.html',
+                             user_name=user_name,
+                             violation_type=formatted_violation,
+                             remarks=remarks)
     mail.send(msg)

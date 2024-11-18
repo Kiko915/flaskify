@@ -1,41 +1,32 @@
+from io import BytesIO
 from PIL import Image
-import io
 
-def verify_image_file(image_data):
+def verify_image_file(file_data):
     """
-    Verify if an image file is valid and meets our requirements.
-    
-    Args:
-        image_data: Bytes of the image file
-        
-    Returns:
-        tuple: (is_valid, message)
-            is_valid (bool): True if the image is valid
-            message (str): Validation message or error details
+    Verify image file format and quality.
+    Returns (is_valid, message)
     """
     try:
-        # Try to open the image using PIL
-        image = Image.open(io.BytesIO(image_data))
+        # Open image using PIL
+        img = Image.open(BytesIO(file_data))
         
-        # Check if it's a supported format
-        if image.format.lower() not in ['jpeg', 'jpg', 'png']:
-            return False, f"Unsupported image format: {image.format}. Please use JPG, JPEG, or PNG."
+        # Check image format
+        if img.format.lower() not in ['jpeg', 'jpg', 'png']:
+            return False, "Invalid image format. Only JPG, JPEG, or PNG files are allowed."
         
-        # Check image dimensions (min 800x600, max 4000x4000)
-        width, height = image.size
-        if width < 800 or height < 600:
-            return False, "Image dimensions too small. Minimum size is 800x600 pixels."
-        if width > 4000 or height > 4000:
-            return False, "Image dimensions too large. Maximum size is 4000x4000 pixels."
+        # Get image dimensions
+        width, height = img.size
         
-        # Check if image is clear enough (not too dark or blurry)
-        # Convert to grayscale and check average brightness
-        gray_image = image.convert('L')
-        brightness = sum(gray_image.getdata()) / (width * height)
-        if brightness < 50:  # threshold for too dark
-            return False, "Image appears too dark. Please provide a clearer image."
-            
-        return True, "Valid image file"
+        # Check minimum dimensions (150x150)
+        if width < 150 or height < 150:
+            return False, f"Image dimensions too small. Minimum size is 150x150 pixels. Current size: {width}x{height}"
+        
+        # Check file size (already checked in route handler)
+        # file_size = len(file_data)
+        # if file_size > 5 * 1024 * 1024:  # 5MB
+        #     return False, "File size must be less than 5MB"
+        
+        return True, "Image validation successful"
         
     except Exception as e:
-        return False, f"Error processing image: {str(e)}"
+        return False, f"Invalid image file: {str(e)}"

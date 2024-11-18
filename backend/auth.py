@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from __init__ import db, mail, OTP, Users, SellerInfo
+from models import db, mail, OTP, Users, SellerInfo
 from flask_mail import Message
 import random
 import string

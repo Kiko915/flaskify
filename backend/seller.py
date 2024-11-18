@@ -2,12 +2,12 @@ from flask import request, jsonify, Blueprint
 from flask_login import login_required, current_user
 from datetime import datetime
 from sqlalchemy import or_
-from __init__ import SellerInfo, Shop, db, Users, Role  # Ensure Shop is imported
-from utils.emails import send_seller_approval_email, send_seller_rejection_email
-import cloudinary.uploader
+from models import SellerInfo, Shop, db, Users, Role  
+from utils.emails import send_seller_approval_email, send_seller_rejection_email, send_seller_suspension_email
 from utils.auth_utils import role_required
 from utils.ocr_utils import verify_bir_certificate
 from utils.file_utils import verify_image_file
+import cloudinary.uploader
 
 seller = Blueprint('seller', __name__)
 
@@ -57,56 +57,62 @@ def add_seller():
         # Upload BIR certificate to Cloudinary if provided
         bir_certificate_url = None
         if bir_certificate:
-            # First validate the image file format and quality
-            is_valid_image, image_error = verify_image_file(bir_certificate.read())
-            if not is_valid_image:
-                return jsonify({
-                    "message": "Invalid BIR certificate image",
-                    "error": image_error,
-                    "error_type": "invalid_image"
-                }), 400
-            
-            # Reset file pointer after reading
-            bir_certificate.seek(0)
-            
-            # Now validate the BIR certificate content using OCR
-            is_valid_bir, bir_error = verify_bir_certificate(bir_certificate.read())
-            if not is_valid_bir:
-                return jsonify({
-                    "message": "Invalid BIR certificate content",
-                    "error": bir_error,
-                    "error_type": "invalid_content"
-                }), 400
-                
-            # Reset file pointer again before upload
-            bir_certificate.seek(0)
-            
             try:
+                # First validate the image file format and quality
+                file_content = bir_certificate.read()
+                is_valid_image, image_error = verify_image_file(file_content)
+                if not is_valid_image:
+                    return jsonify({
+                        "message": "Invalid BIR certificate image",
+                        "error": image_error,
+                        "error_type": "invalid_image"
+                    }), 400
+                
+                # Reset file pointer after reading
+                bir_certificate.seek(0)
+                
+                # Now validate the BIR certificate content using OCR
+                is_valid_bir, bir_error = verify_bir_certificate(file_content)
+                if not is_valid_bir:
+                    return jsonify({
+                        "message": "Invalid BIR certificate content",
+                        "error": bir_error,
+                        "error_type": "invalid_content"
+                    }), 400
+                    
+                # Reset file pointer again before upload
+                bir_certificate.seek(0)
+                
+                # Upload to Cloudinary
                 upload_result = cloudinary.uploader.upload(
                     bir_certificate,
-                    folder="bir_certificates",  # Cloudinary folder to organize uploads
-                    resource_type="raw",  # For handling documents
-                    allowed_formats=["pdf", "png", "jpg", "jpeg"],  # Allowed file formats
-                    public_id=f"bir_{current_user.user_uuid}_{datetime.now().timestamp()}"  # Unique identifier
+                    folder="bir_certificates",
+                    resource_type="auto",  # Changed to auto to handle different file types
+                    allowed_formats=["pdf", "png", "jpg", "jpeg"]
                 )
                 bir_certificate_url = upload_result['secure_url']
-            except Exception as upload_error:
+            except Exception as e:
+                print(f"Error processing file: {str(e)}")  # Add debugging
                 return jsonify({
-                    "message": "Failed to upload BIR certificate",
-                    "error": str(upload_error)
+                    "message": "Failed to process BIR certificate",
+                    "error": str(e)
                 }), 400
 
         # Create new seller instance
         new_seller = SellerInfo(
-            user_uuid=current_user.user_uuid,  # Associate with current user
+            user_id=current_user.user_uuid,  # Changed to match the model field
+            business_name=owner_name,  # Added missing field
             business_owner=owner_name,
             business_type=data.get('sellerType'),
-            tax_id=data.get('tinNumber') if has_tin else None,
             business_email=business_email,
             business_phone=data.get('phNum'),
+            tax_id=data.get('tinNumber') if has_tin else None,
             tax_certificate_doc=bir_certificate_url,
-            date_registered=datetime.now(),
-            status='Pending'  # Initial status for admin review
+            business_country="Philippines",  # Added required fields
+            business_province="",
+            business_city="",
+            business_address="",
+            status='Pending'
         )
 
         # Save to database
@@ -115,11 +121,12 @@ def add_seller():
 
         return jsonify({
             "message": "Seller registration submitted successfully!",
-            "seller_id": new_seller.seller_id  # Changed to seller_id
+            "seller_id": new_seller.seller_id
         }), 201
 
     except Exception as e:
         db.session.rollback()
+        print(f"Error in add_seller: {str(e)}")  # Add debugging
         return jsonify({
             "message": "Failed to register seller",
             "error": str(e)
@@ -225,71 +232,53 @@ def update_seller(seller_id):
 @login_required
 @role_required(Role.ADMIN)
 def update_seller_status(seller_id):
-    if not current_user.is_admin():  
-        return jsonify({"error": "Access denied. Admins only"}), 403
-   
-    seller = SellerInfo.query.get(seller_id)
-    if not seller:
-        return jsonify({"error": "Seller not found"}), 404
-   
-    data = request.get_json()
-    new_status = data.get('status')
-    admin_notes = data.get('remarks')
-   
-    # Validate status
-    if new_status not in ['Pending', 'Approved', 'Rejected']:
-        return jsonify({"error": "Invalid status"}), 400
-   
     try:
-        if new_status == 'Rejected':
-            # Store email and owner name before deletion for email notification
-            business_email = seller.business_email
-            business_owner = seller.business_owner
-            
-            # Update status first (for audit purposes if needed)
-            seller.update_status(new_status, current_user, admin_notes)
-            
-            """# Update associated user role back to USER if needed
-            user = Users.query.get(seller.user_uuid)
-            if user and user.role == Role.SELLER:
-                user.role = Role.USER"""
-            
-            # Delete only the seller record
-            db.session.delete(seller)
-            db.session.commit()
-            
-            # Send rejection email after successful deletion
-            send_seller_rejection_email(business_email, business_owner)
-            
-            return jsonify({
-                "message": "Seller application rejected and seller profile removed",
-                "user_preserved": True
-            })
-            
-        else:  # For Approved or Pending status
-            # Update seller status with admin info
-            seller.update_status(new_status, current_user, admin_notes)
-            
-            # If status is Approved, update user role to Seller
+        data = request.get_json()
+        new_status = data.get('status')
+        remarks = data.get('remarks')
+        approved_by = data.get('approved_by')
+        violation_type = data.get('violation_type')
+
+        if not new_status:
+            return jsonify({'error': 'Status is required'}), 400
+
+        seller = SellerInfo.query.get_or_404(seller_id)
+        old_status = seller.status
+
+        # Update seller status and related fields
+        seller.status = new_status
+        seller.remarks = remarks
+        seller.approved_by = approved_by
+        
+        if new_status == 'Approved':
+            seller.approval_date = datetime.now()
+        elif new_status == 'Suspended':
+            if not violation_type:
+                return jsonify({'error': 'Violation type is required for suspension'}), 400
+            seller.violation_type = violation_type
+
+        db.session.commit()
+
+        # Send email notification based on status change
+        try:
             if new_status == 'Approved':
-                user = Users.query.get(seller.user_uuid)
-                if user:
-                    user.role = Role.SELLER
-                    # Send email notification to seller
-                    send_seller_approval_email(seller.business_email, seller.business_owner)
-            
-            db.session.commit()
-            return jsonify({
-                "message": f"Seller status updated to {new_status}",
-                "role_updated": new_status == 'Approved'
-            })
-       
+                send_seller_approval_email(seller.business_email, seller.business_owner)
+            elif new_status == 'Rejected':
+                send_seller_rejection_email(seller.business_email, seller.business_owner, remarks)
+            elif new_status == 'Suspended':
+                send_seller_suspension_email(seller.business_email, seller.business_owner, remarks, violation_type)
+        except Exception as e:
+            # Log the error but don't fail the status update
+            print(f"Failed to send email notification: {str(e)}")
+
+        return jsonify({
+            'message': f'Seller status updated to {new_status}',
+            'seller_id': seller_id
+        }), 200
+
     except Exception as e:
         db.session.rollback()
-        return jsonify({
-            "error": "Failed to update seller status",
-            "details": str(e)
-        }), 500
+        return jsonify({'error': str(e)}), 500
     
 
 # Add a new route to get all the shops of a seller by seller_id
@@ -338,7 +327,7 @@ def get_seller_shops(seller_id):
             "business_province": shop.business_province,
             "business_city": shop.business_city,
             "business_address": shop.business_address,
-            "business_registration_doc": shop.business_registration_doc,
+            "shop_logo": shop.shop_logo,
             "total_products": shop.total_products,
             "shop_sales": float(shop.shop_sales) if shop.shop_sales else 0.00,
             "date_created": shop.date_created.isoformat() if shop.date_created else None,
@@ -396,45 +385,48 @@ def create_shop(seller_id):
         if not all([business_name, business_country, business_province, business_city, business_address]):
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Validate BIR certificate
-        if 'business_registration_doc' not in request.files:
-            return jsonify({"error": "BIR certificate is required"}), 400
+        # Handle shop logo upload
+        shop_logo_url = None
+        if 'shop_logo' in request.files:
+            shop_logo = request.files['shop_logo']
+            if shop_logo:
+                # Validate file size (5MB limit)
+                file_data = shop_logo.read()
+                if len(file_data) > 5 * 1024 * 1024:  # 5MB in bytes
+                    return jsonify({"error": "Shop logo file size must be less than 5MB"}), 400
 
-        doc = request.files['business_registration_doc']
-        if not doc:
-            return jsonify({"error": "BIR certificate is required"}), 400
+                # Verify image quality and format
+                is_valid, message = verify_image_file(file_data)
+                if not is_valid:
+                    return jsonify({
+                        "error": "Invalid shop logo image",
+                        "details": message
+                    }), 400
 
-        # Check file size (5MB limit)
-        file_data = doc.read()
-        if len(file_data) > 5 * 1024 * 1024:  # 5MB in bytes
-            return jsonify({"error": "File size must be less than 5MB"}), 400
+                # Reset file pointer for upload
+                shop_logo.seek(0)
 
-        # Verify image quality
-        is_valid, message = verify_image_file(file_data)
-        if not is_valid:
-            return jsonify({
-                "error": "Invalid BIR certificate",
-                "details": message
-            }), 400
-
-        # Reset file pointer for upload
-        doc.seek(0)
-
-        # Upload to Cloudinary if validation passes
-        try:
-            upload_result = cloudinary.uploader.upload(
-                doc,
-                folder="shop_documents",
-                resource_type="auto",
-                allowed_formats=["jpg", "jpeg", "png"],
-                public_id=f"shop_{seller_id}_{datetime.now().timestamp()}"
-            )
-            business_registration_doc_url = upload_result['secure_url']
-        except Exception as upload_error:
-            return jsonify({
-                "error": "Failed to upload BIR certificate",
-                "details": str(upload_error)
-            }), 400
+                try:
+                    # Upload new logo to Cloudinary
+                    upload_result = cloudinary.uploader.upload(
+                        shop_logo,
+                        folder="shop_logos",
+                        resource_type="image",
+                        allowed_formats=["jpg", "jpeg", "png"],
+                        public_id=f"shop_logo_{seller_id}_{datetime.now().timestamp()}",
+                        transformation={
+                            'width': 500,
+                            'height': 500,
+                            'crop': 'fill',
+                            'quality': 'auto:good'
+                        }
+                    )
+                    shop_logo_url = upload_result['secure_url']
+                except Exception as upload_error:
+                    return jsonify({
+                        "error": "Failed to upload shop logo",
+                        "details": str(upload_error)
+                    }), 400
 
         # Create new shop
         new_shop = Shop(
@@ -444,7 +436,7 @@ def create_shop(seller_id):
             business_province=business_province,
             business_city=business_city,
             business_address=business_address,
-            business_registration_doc=business_registration_doc_url,
+            shop_logo=shop_logo_url,
             total_products=0,
             shop_sales=0.00,
             date_created=datetime.now()
@@ -456,7 +448,8 @@ def create_shop(seller_id):
         return jsonify({
             "message": "Shop created successfully",
             "shop_uuid": new_shop.shop_uuid,
-            "business_name": new_shop.business_name
+            "business_name": new_shop.business_name,
+            "shop_logo": new_shop.shop_logo
         }), 201
 
     except Exception as e:
@@ -491,24 +484,59 @@ def update_shop(seller_id, shop_uuid):
         if not all([business_name, business_country, business_province, business_city, business_address]):
             return jsonify({"error": "Missing required fields"}), 400
 
-        # Handle optional document upload
-        if 'business_registration_doc' in request.files:
-            doc = request.files['business_registration_doc']
-            if doc:
+        # Handle shop logo update
+        if 'shop_logo' in request.files:
+            shop_logo = request.files['shop_logo']
+            if shop_logo:
+                # Validate file size (5MB limit)
+                file_data = shop_logo.read()
+                if len(file_data) > 5 * 1024 * 1024:  # 5MB in bytes
+                    return jsonify({"error": "Shop logo file size must be less than 5MB"}), 400
+
+                # Verify image quality and format
+                is_valid, message = verify_image_file(file_data)
+                if not is_valid:
+                    return jsonify({
+                        "error": "Invalid shop logo image",
+                        "details": message
+                    }), 400
+
+                # Reset file pointer for upload
+                shop_logo.seek(0)
+
                 try:
+                    # Upload new logo to Cloudinary
                     upload_result = cloudinary.uploader.upload(
-                        doc,
-                        folder="shop_documents",
-                        resource_type="auto",
-                        allowed_formats=["pdf", "png", "jpg", "jpeg", "doc", "docx"],
-                        public_id=f"shop_{seller_id}_{datetime.now().timestamp()}"
+                        shop_logo,
+                        folder="shop_logos",
+                        resource_type="image",
+                        allowed_formats=["jpg", "jpeg", "png"],
+                        public_id=f"shop_logo_{seller_id}_{datetime.now().timestamp()}",
+                        transformation={
+                            'width': 500,
+                            'height': 500,
+                            'crop': 'fill',
+                            'quality': 'auto:good'
+                        }
                     )
-                    shop.business_registration_doc = upload_result['secure_url']
+                    shop.shop_logo = upload_result['secure_url']
                 except Exception as upload_error:
                     return jsonify({
-                        "error": "Failed to upload business registration document",
+                        "error": "Failed to upload shop logo",
                         "details": str(upload_error)
                     }), 400
+        elif 'remove_logo' in request.form and request.form['remove_logo'] == 'true':
+            # Handle logo removal
+            if shop.shop_logo:
+                try:
+                    # Extract public_id from the Cloudinary URL
+                    public_id = shop.shop_logo.split('/')[-1].split('.')[0]
+                    # Delete the image from Cloudinary
+                    cloudinary.uploader.destroy(public_id)
+                except Exception as delete_error:
+                    print(f"Warning: Failed to delete old logo from Cloudinary: {str(delete_error)}")
+                # Set shop_logo to None
+                shop.shop_logo = None
 
         # Update shop information
         shop.business_name = business_name
@@ -529,7 +557,7 @@ def update_shop(seller_id, shop_uuid):
                 "business_province": shop.business_province,
                 "business_city": shop.business_city,
                 "business_address": shop.business_address,
-                "business_registration_doc": shop.business_registration_doc,
+                "shop_logo": shop.shop_logo,
                 "last_updated": shop.last_updated.isoformat()
             }
         }), 200
@@ -595,7 +623,7 @@ def get_shop_details(seller_id, shop_uuid):
                 "business_city": shop.business_city,
                 "business_province": shop.business_province,
                 "business_country": shop.business_country,
-                "business_registration_doc": shop.business_registration_doc,
+                "shop_logo": shop.shop_logo,
                 "total_products": shop.total_products,
                 "shop_sales": float(shop.shop_sales),
                 "is_archived": shop.is_archived,
@@ -611,3 +639,41 @@ def get_shop_details(seller_id, shop_uuid):
 
     except Exception as e:
         return jsonify({"message": "Failed to fetch shop details", "error": str(e)}), 500
+
+def send_suspension_email(email, business_owner, remarks, violation_type):
+    subject = "Account Suspension Notice - Flaskify Seller Account"
+    
+    violation_types = {
+        'counterfeit': 'Selling Counterfeit Products',
+        'misrepresentation': 'Product Misrepresentation',
+        'shipping': 'Shipping Violations',
+        'customer_service': 'Poor Customer Service',
+        'policy': 'Policy Violations',
+        'fraud': 'Fraudulent Activity',
+        'other': 'Other Violations'
+    }
+    
+    violation_description = violation_types.get(violation_type, 'Policy Violation')
+    
+    body = f"""
+    Dear {business_owner},
+
+    We regret to inform you that your seller account on Flaskify has been suspended due to:
+    
+    Violation Type: {violation_description}
+    
+    Additional Details:
+    {remarks}
+    
+    During the suspension period, you will not be able to:
+    - List new products
+    - Process new orders
+    - Access seller features
+    
+    To appeal this suspension or provide additional information, please contact our seller support team.
+    
+    Best regards,
+    The Flaskify Team
+    """
+    
+    send_email(email, subject, body)

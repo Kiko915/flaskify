@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #ff4444;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .content {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 5px;
+            border: 1px solid #ddd;
+        }
+        .violation {
+            background-color: #fff3f3;
+            padding: 15px;
+            border-left: 4px solid #ff4444;
+            margin: 15px 0;
+        }
+        .restrictions {
+            background-color: #f5f5f5;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+    	<div style="width: 120px; height: 120px; margin: 0 auto 15px; background-color: #ffffff; border-radius: 60px; padding: 15px;">
+                <img src="https://res.cloudinary.com/da3b5g9ad/image/upload/f_auto,q_auto/flaskify-primary_szhmav" alt="Flaskify Logo" style="width: 100%; height: auto;">
+            </div>
+        <h2>Account Suspension Notice</h2>
+    </div>
+    
+    <div class="content">
+        <p>Dear {{ user_name }},</p>
+        
+        <p>We regret to inform you that your seller account on Flaskify has been suspended.</p>
+        
+        <div class="violation">
+            <h3>Reason for Suspension:</h3>
+            <p><strong>Violation Type:</strong> {{ violation_type }}</p>
+            <p><strong>Details:</strong> {{ remarks }}</p>
+        </div>
+        
+        <div class="restrictions">
+            <h3>During this suspension period:</h3>
+            <ul>
+                <li>You cannot list new products</li>
+                <li>You cannot process new orders</li>
+                <li>Your existing listings will be temporarily hidden</li>
+                <li>Access to seller features will be restricted</li>
+            </ul>
+        </div>
+        
+        <p>If you believe this suspension was made in error or would like to appeal this decision, please contact our seller support team with any relevant information or documentation.</p>
+        
+        <p>We hope to resolve this situation promptly and appreciate your cooperation.</p>
+    </div>
+    
+    <div class="footer">
+        <p>Best regards,<br>The Flaskify Team</p>
+    </div>
+</body>
+</html>

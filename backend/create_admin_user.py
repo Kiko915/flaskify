@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from __init__ import db, create_app, Users, AdminInfo
+from models import db, create_app, Users, AdminInfo
 from werkzeug.security import generate_password_hash
 
 # Initialize the Flask app context

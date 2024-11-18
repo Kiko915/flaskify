@@ -14,8 +14,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -23,20 +32,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import SellerDetailsDialog from '@/components/seller/SellerDetailsDialog';
 import { CheckCircle, XCircle, Clock, Search, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/utils/AuthContext';
+import { Separator } from '@/components/ui/separator';
 
 const SellerVerifications = () => {
   const { user } = useAuth();
@@ -48,31 +50,87 @@ const SellerVerifications = () => {
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [handleAccept, setHandleAccept] = useState({ id: null, open: false });
-  const [handleReject, setHandleReject] = useState({ id: null, open: false });
+  const [actionDialog, setActionDialog] = useState({ 
+    type: null, // 'approve', 'reject', or 'suspend'
+    sellerId: null, 
+    open: false 
+  });
   const [formData, setFormData] = useState({
-    status: 'Approved',
+    status: '',
     remarks: '',
-    approved_by: user?.user_uuid
+    approved_by: user?.user_uuid,
+    violation_type: ''
   });
-  const [formData2, setFormData2] = useState({
-    status: 'Rejected',
-    remarks: '',
-    approved_by: user?.user_uuid
-  });
+
+  const violationTypes = [
+    { value: 'counterfeit', label: 'Selling Counterfeit Products' },
+    { value: 'misrepresentation', label: 'Product Misrepresentation' },
+    { value: 'shipping', label: 'Shipping Violations' },
+    { value: 'customer_service', label: 'Poor Customer Service' },
+    { value: 'policy', label: 'Policy Violations' },
+    { value: 'fraud', label: 'Fraudulent Activity' },
+    { value: 'other', label: 'Other Violations' }
+  ];
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
   };
 
-  const handleInputChange2 = (e) => {
-    const { name, value } = e.target;
-    setFormData2({ ...formData2, [name]: value });
+  const handleActionClick = (type, sellerId) => {
+    setActionDialog({ 
+      type, 
+      sellerId, 
+      open: true 
+    });
+    setFormData({
+      status: type === 'approve' ? 'Approved' : type === 'reject' ? 'Rejected' : 'Suspended',
+      remarks: '',
+      approved_by: user?.user_uuid,
+      violation_type: ''
+    });
   };
 
-  
+  const handleActionSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setError(null);
+      setLoading(true);
+      const response = await fetch(`http://localhost:5555/admin/seller/${actionDialog.sellerId}/status`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(formData),
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to update seller status');
+      }
 
+      const data = await response.json();
+      // toast.success(data.message);
+      
+      // Reset form and close dialog
+      setFormData({
+        status: '',
+        remarks: '',
+        approved_by: user?.user_uuid,
+        violation_type: ''
+      });
+      setActionDialog({ type: null, sellerId: null, open: false });
+      
+      // Refresh seller list
+      fetchSellers();
+      
+    } catch (err) {
+      setError('Failed to update status: ' + err.message);
+      // toast.error('Failed to update seller status');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Fetch all sellers
   const fetchSellers = async () => {
@@ -96,176 +154,21 @@ const SellerVerifications = () => {
     }
   };
 
-  // Fetch seller details
-  const fetchSellerDetails = async (sellerId) => {
-    setDetailsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch(`http://localhost:5555/seller/${sellerId}`, {
-        credentials: 'include',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch seller details');
-      }
-
-      const data = await response.json();
-      setSelectedSeller(data);
-      setIsDialogOpen(true);
-    } catch (err) {
-      setError('Failed to load seller details: ' + err.message);
-    } finally {
-      setDetailsLoading(false);
-    }
-  };
-
-  const handleApproval = async (e) => {
-    e.preventDefault();
-    try {
-      // Implement your status update API call here
-      setError(null);
-      setLoading(true);
-      const response = await fetch(`http://localhost:5555//admin/seller/${handleAccept.id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-        credentials: 'include',
-      });
-      if (response.ok) {
-        setHandleAccept(true);
-        setFormData({
-          status: 'Approved',
-          remarks: '',
-          approved_by: user?.user_uuid
-        });
-        setLoading(false);
-        setIsDialogOpen(false);
-        setSelectedSeller(null);
-        fetchSellers();
-      } else {
-        setError('Failed to update status');
-      }
-    } catch (err) {
-      setError('Failed to update status: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRejection = async (e) => {
-    e.preventDefault();
-    try {
-      // Implement your status update API call here
-      setError(null);
-      setLoading(true);
-      const response = await fetch(`http://localhost:5555//admin/seller/${handleReject.id}/status`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData2),
-        credentials: 'include',
-      });
-      if (response.ok) {
-        setHandleReject(true);
-        setFormData2({
-          status: 'Rejected',
-          remarks: '',
-          approved_by: user?.user_uuid
-        });
-        setLoading(false);
-        setIsDialogOpen(false);
-        setSelectedSeller(null);
-        fetchSellers();
-      } else {
-        setError('Failed to update status');
-      }
-    } catch (err) {
-      setError('Failed to update status: ' + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-
-  // Update seller status
-  const handleUpdateStatus = async (sellerId, newStatus) => {
-    try {
-      // Implement your status update API call here
-      setError(null);
-      // After successful update, refresh the sellers list
-      await fetchSellers();
-    } catch (err) {
-      setError('Failed to update status: ' + err.message);
-    }
-  };
-
-  // Fetch sellers on component mount
   useEffect(() => {
     fetchSellers();
   }, []);
 
   const getStatusBadge = (status) => {
-    // Handle null or undefined status
-    if (!status) {
-      return (
-        <Badge className="bg-gray-200 text-gray-700">
-          Unknown
-        </Badge>
-      );
-    }
-
-    // Normalize status to lowercase for consistent matching
-    const normalizedStatus = status.toLowerCase();
-
-    const statusConfig = {
-      pending: {
-        component: Clock,
-        className: "bg-yellow-200 text-yellow-700"
-      },
-      approved: {
-        component: CheckCircle,
-        className: "bg-green-200 text-green-700"
-      },
-      rejected: {
-        component: XCircle,
-        className: "bg-red-200 text-red-700"
-      },
-      'under review': {
-        component: Clock,
-        className: "bg-blue-200 text-blue-700"
-      },
-      suspended: {
-        component: XCircle,
-        className: "bg-orange-200 text-orange-700"
-      },
-      inactive: {
-        component: XCircle,
-        className: "bg-gray-200 text-gray-700"
-      },
-      active: {
-        component: CheckCircle,
-        className: "bg-green-200 text-green-700"
-      },
+    const statusColors = {
+      Pending: 'bg-yellow-500',
+      Approved: 'bg-green-500',
+      Rejected: 'bg-red-500',
+      Suspended: 'bg-gray-500'
     };
 
-    // If status isn't in our config, return a default badge
-    if (!statusConfig[normalizedStatus]) {
-      return (
-        <Badge className="bg-gray-200 text-gray-700">
-          {status.charAt(0).toUpperCase() + status.slice(1)}
-        </Badge>
-      );
-    }
-
-    const StatusIcon = statusConfig[normalizedStatus].component;
-
     return (
-      <Badge className={statusConfig[normalizedStatus].className}>
-        <StatusIcon className="w-4 h-4 mr-1" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge className={`${statusColors[status] || 'bg-gray-200'} text-white`}>
+        {status || 'Unknown'}
       </Badge>
     );
   };
@@ -343,10 +246,11 @@ const SellerVerifications = () => {
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="Pending">Pending</SelectItem>
                 <SelectItem value="Approved">Approved</SelectItem>
                 <SelectItem value="Rejected">Rejected</SelectItem>
+                <SelectItem value="Suspended">Suspended</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -395,33 +299,43 @@ const SellerVerifications = () => {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fetchSellerDetails(seller.id)}
-                            disabled={detailsLoading}
-                          >
-                            View Details
-                          </Button>
                           {seller.status === 'Pending' && (
                             <>
                               <Button
-                                variant="default"
+                                variant="outline"
                                 size="sm"
-                                className="bg-green-600 hover:bg-green-700"
-                                onClick={() => setHandleAccept({  id: seller.id, open: true })}
+                                onClick={() => handleActionClick('approve', seller.id)}
                               >
                                 Approve
                               </Button>
                               <Button
                                 variant="destructive"
                                 size="sm"
-                                onClick={() => setHandleReject({ id: seller.id, open: true })}
+                                onClick={() => handleActionClick('reject', seller.id)}
                               >
                                 Reject
                               </Button>
                             </>
                           )}
+                          {seller.status === 'Approved' && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleActionClick('suspend', seller.id)}
+                            >
+                              Suspend
+                            </Button>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSeller(seller);
+                              setIsDialogOpen(true);
+                            }}
+                          >
+                            View Details
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -451,62 +365,69 @@ const SellerVerifications = () => {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={handleAccept.open} onOpenChange={handleAccept.open}>
-        <DialogContent className="max-w-2xl">
+      <Dialog open={actionDialog.open} onOpenChange={() => setActionDialog({ type: null, sellerId: null, open: false })}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Do you want to approve this seller?</DialogTitle>
+            <DialogTitle>
+              {actionDialog.type === 'approve' ? 'Approve Seller' :
+               actionDialog.type === 'reject' ? 'Reject Seller' : 'Suspend Seller'}
+            </DialogTitle>
             <DialogDescription>
-              Add additional information about the approval action
+              {actionDialog.type === 'suspend' && 'Select the violation type and provide detailed comments about the suspension.'}
             </DialogDescription>
           </DialogHeader>
-          <form className='space-y-4' onSubmit={handleApproval} >
-            <div className='space-y-2'>
-              <Label htmlFor="admin_notes">Admin Notes</Label>
-              <Textarea id="admin_notes" name="remarks" placeholder="Enter admin notes" maxLength={250} onChange={(e) => handleInputChange(e)} value={formData.remarks} />
-              <p className="text-sm text-muted-foreground text-right">
-                {formData.remarks?.length || 0} / 250 characters
-              </p>
+          <form onSubmit={handleActionSubmit}>
+            <div className="space-y-4 py-4">
+              {actionDialog.type === 'suspend' && (
+                <div className="space-y-2">
+                  <Label htmlFor="violation_type">Violation Type</Label>
+                  <Select
+                    value={formData.violation_type}
+                    onValueChange={(value) => setFormData({ ...formData, violation_type: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select violation type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {violationTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="remarks">Admin Comments</Label>
+                <Textarea
+                  id="remarks"
+                  name="remarks"
+                  placeholder={actionDialog.type === 'suspend' 
+                    ? "Provide detailed explanation of the violation and suspension..." 
+                    : "Enter your comments..."}
+                  value={formData.remarks}
+                  onChange={handleInputChange}
+                  required
+                />
+              </div>
             </div>
-            <div className='space-y-2'>
-              <Label htmlFor="approved_by">Approved By</Label>
-              <Input id="approved_by" name="approved_by" placeholder="Approved By" required value={user?.username + " - " + user?.role} disabled />
-            </div>
-          
-          <Separator className="mt-4" />
-          <div className="flex justify-end gap-4">
-            <Button variant="outline" onClick={() => setHandleAccept({ open: false })}>Cancel</Button>
-            <Button type="submit" variant="default" className="bg-green-600 hover:bg-green-700">Approve</Button>
-          </div>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={handleReject.open} onOpenChange={setHandleReject.open}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Do you want to reject this seller?</DialogTitle>
-            <DialogDescription>
-              Add additional information about the rejection action
-            </DialogDescription>
-          </DialogHeader>
-          <form className='space-y-4' onSubmit={handleRejection} >
-            <div className='space-y-2'>
-              <Label htmlFor="admin_notes">Admin Notes</Label>
-              <Textarea id="admin_notes" name="remarks" placeholder="Enter admin notes" maxLength={250} onChange={(e) => handleInputChange2(e)} value={formData2.remarks} />
-              <p className="text-sm text-muted-foreground text-right">
-                {formData2.remarks?.length || 0} / 250 characters
-              </p>
-            </div>
-            <div className='space-y-2'>
-              <Label htmlFor="approved_by">Rejected By</Label>
-              <Input id="approved_by" name="approved_by" placeholder="Approved By" required value={user?.username + " - " + user?.role} disabled />
-            </div>
-          
-          <Separator className="mt-4" />
-          <div className="flex justify-end gap-4">
-            <Button variant="outline" onClick={() => setHandleReject({ open: false })}>Cancel</Button>
-            <Button type="submit" variant="default" className="bg-red-600 hover:bg-red-700">Reject</Button>
-          </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setActionDialog({ type: null, sellerId: null, open: false })}
+              >
+                Cancel
+              </Button>
+              <Button 
+                variant={actionDialog.type === 'approve' ? 'default' : 'destructive'} 
+                type="submit" 
+                disabled={loading || (actionDialog.type === 'suspend' && !formData.violation_type)}
+              >
+                {loading ? 'Processing...' : 'Confirm'}
+              </Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
