@@ -31,11 +31,14 @@ def send_seller_approval_email(email, user_name):
     mail.send(msg)
 
 
-def send_seller_rejection_email(email, user_name):
+def send_seller_rejection_email(email, user_name, rejection_reason, admin_notes):
     msg = Message('Your Seller Account is Rejected', 
                   sender='francismistica06@gmail.com',
                     recipients=[email])
-    msg.html = render_template('seller-rejection-notification.html', user_name=user_name)
+    msg.html = render_template('seller-rejection-notification.html', 
+                             user_name=user_name,
+                             rejection_reason=rejection_reason,
+                             admin_notes=admin_notes)
     mail.send(msg)
 
 

@@ -3,46 +3,65 @@ import cv2
 import io
 import re
 from PIL import Image, ImageEnhance
-import keras_ocr
+from paddleocr import PaddleOCR, draw_ocr
 import os
 import time
-
-# Initialize keras-ocr pipeline
-pipeline = keras_ocr.pipeline.Pipeline()
+import uuid
 
 # Initialize PaddleOCR with English support
-ocr = PaddleOCR(use_angle_cls=True, lang='en')
+ocr = PaddleOCR(lang='en')
 
 def verify_bir_certificate(image_data):
     """
-    Verify if an image contains valid BIR certificate content using keras-ocr.
+    Verify if an image contains valid BIR certificate content using PaddleOCR.
+    Also saves a visualization of the detected text.
     
     Args:
         image_data: Bytes of the image file
         
     Returns:
-        tuple: (is_valid, message)
+        tuple: (is_valid, message, viz_path)
             is_valid (bool): True if the image appears to be a valid BIR certificate
             message (str): Validation message or error details
+            viz_path (str): Path to the visualization image, or None if visualization failed
     """
     try:
-        # Convert image bytes to numpy array
-        image = np.array(Image.open(io.BytesIO(image_data)))
+        # Convert image bytes to PIL Image
+        image = Image.open(io.BytesIO(image_data)).convert('RGB')
         
-        # Perform OCR using keras-ocr
-        images = [image]
-        prediction_groups = pipeline.recognize(images)
+        # Convert to numpy array for OCR
+        img_array = np.array(image)
         
-        if not prediction_groups or not prediction_groups[0]:
-            return False, "No text detected in the image"
+        # Perform OCR
+        result = ocr.ocr(img_array, cls=False)
+        
+        if not result or not result[0]:
+            return False, "No text detected in the image", None
 
-        # Extract text from predictions
-        text = " ".join([word[0].lower() for word in prediction_groups[0]])
+        # Create visualization
+        boxes = [line[0] for line in result[0]]
+        txts = [line[1][0] for line in result[0]]
+        scores = [line[1][1] for line in result[0]]
+
+        # Generate unique filename for visualization
+        viz_filename = f'ocr_viz_{uuid.uuid4().hex[:8]}.jpg'
+        viz_path = os.path.join('static', 'ocr_results', viz_filename)
+        
+        # Ensure directory exists
+        os.makedirs(os.path.join('static', 'ocr_results'), exist_ok=True)
+        
+        # Draw OCR results on image
+        font_path = os.path.join('static', 'fonts', 'arial.ttf')  # Update with your font path
+        im_show = draw_ocr(img_array, boxes, txts, scores, font_path=font_path)
+        im_show = Image.fromarray(im_show)
+        im_show.save(viz_path)
+
+        # Extract and combine all detected text
+        text = " ".join([line[1][0].lower() for line in result[0]])
         
         # Keywords that should be present in a BIR certificate
         required_keywords = [
             'bir',
-            'bureau of internal revenue',
             'certificate',
             'registration',
             'tin',
@@ -56,16 +75,16 @@ def verify_bir_certificate(image_data):
         ]
         
         if missing_keywords:
-            return False, f"Missing required content: {', '.join(missing_keywords)}"
+            return False, f"Missing required content: {', '.join(missing_keywords)}", viz_path
             
         # Look for TIN number pattern (XXX-XXX-XXX-XXX)
         tin_pattern = r'\d{3}[-\s]?\d{3}[-\s]?\d{3}[-\s]?\d{3}'
         tin_match = re.search(tin_pattern, text)
         
         if not tin_match:
-            return False, "No valid TIN number found"
+            return False, "No valid TIN number found", viz_path
             
-        return True, "Valid BIR certificate"
+        return True, "Valid BIR certificate", viz_path
 
     except Exception as e:
-        return False, f"Error processing image: {str(e)}"
+        return False, f"Error processing image: {str(e)}", None

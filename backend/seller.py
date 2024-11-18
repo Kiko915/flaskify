@@ -1,4 +1,4 @@
-from flask import request, jsonify, Blueprint
+from flask import request, jsonify, Blueprint, send_from_directory
 from flask_login import login_required, current_user
 from datetime import datetime
 from sqlalchemy import or_
@@ -8,6 +8,7 @@ from utils.auth_utils import role_required
 from utils.ocr_utils import verify_bir_certificate
 from utils.file_utils import verify_image_file
 import cloudinary.uploader
+import os
 
 seller = Blueprint('seller', __name__)
 
@@ -72,12 +73,13 @@ def add_seller():
                 bir_certificate.seek(0)
                 
                 # Now validate the BIR certificate content using OCR
-                is_valid_bir, bir_error = verify_bir_certificate(file_content)
+                is_valid_bir, bir_error, viz_path = verify_bir_certificate(file_content)
                 if not is_valid_bir:
                     return jsonify({
                         "message": "Invalid BIR certificate content",
                         "error": bir_error,
-                        "error_type": "invalid_content"
+                        "error_type": "invalid_content",
+                        "visualization": viz_path
                     }), 400
                     
                 # Reset file pointer again before upload
@@ -157,17 +159,33 @@ def check_availability():
 @role_required(Role.ADMIN)
 def get_all_sellers():
     sellers = SellerInfo.query.all()
-    print(sellers)
-    return jsonify([{
-        "id": seller.seller_id,
-        "business_owner": seller.business_owner,
-        "business_type": seller.business_type,
-        "status": seller.status,
-        "submission_date": seller.date_registered,
-        "tax_id": seller.tax_id,
-        "business_email": seller.business_email,
-        "bir_certificate": seller.tax_certificate_doc,
-    } for seller in sellers])
+    seller_list = []
+    
+    for seller in sellers:
+        seller_data = {
+            "id": seller.seller_id,
+            "business_owner": seller.business_owner,
+            "business_email": seller.business_email,
+            "business_phone": seller.business_phone,
+            "business_type": seller.business_type,
+            "status": seller.status,
+            "submission_date": seller.submission_date,
+            "tax_id": seller.tax_id,
+            "bir_certificate": seller.tax_certificate_doc,
+            "approval_date": seller.approval_date,
+            "remarks": seller.remarks
+        }
+        
+        # Get admin name if approved_by exists
+        if seller.approved_by:
+            admin = Users.query.get(seller.approved_by)
+            seller_data["approved_by"] = f"{admin.first_name} {admin.last_name}" if admin else seller.approved_by
+        else:
+            seller_data["approved_by"] = None
+            
+        seller_list.append(seller_data)
+    
+    return jsonify(seller_list)
 
 
 @seller.route('/seller/<string:seller_id>', methods=['GET'])
@@ -238,6 +256,7 @@ def update_seller_status(seller_id):
         remarks = data.get('remarks')
         approved_by = data.get('approved_by')
         violation_type = data.get('violation_type')
+        rejection_reason = data.get('rejection_reason')
 
         if not new_status:
             return jsonify({'error': 'Status is required'}), 400
@@ -264,7 +283,7 @@ def update_seller_status(seller_id):
             if new_status == 'Approved':
                 send_seller_approval_email(seller.business_email, seller.business_owner)
             elif new_status == 'Rejected':
-                send_seller_rejection_email(seller.business_email, seller.business_owner, remarks)
+                send_seller_rejection_email(seller.business_email, seller.business_owner, rejection_reason, remarks)
             elif new_status == 'Suspended':
                 send_seller_suspension_email(seller.business_email, seller.business_owner, remarks, violation_type)
         except Exception as e:

@@ -22,7 +22,18 @@
                 🥺
             </div>
 
-            <p style="font-size: 16px; color: #34495e;">We encourage you to review our seller guidelines and, if desired, make adjustments to reapply in the future. Our aim is to ensure a high standard of quality for all sellers on our platform, and we value your understanding.</p>
+            <!-- Rejection Details Section -->
+            <div style="background-color: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 20px; margin: 20px 0;">
+                <h3 style="color: #c53030; font-size: 18px; margin: 0 0 12px 0;">Reason for Rejection</h3>
+                <p style="color: #2d3748; font-size: 16px; margin: 0 0 20px 0;">{{ rejection_reason }}</p>
+                
+                {% if admin_notes %}
+                <h3 style="color: #2c3e50; font-size: 18px; margin: 0 0 12px 0;">Additional Notes</h3>
+                <p style="color: #4a5568; font-size: 16px; margin: 0;">{{ admin_notes }}</p>
+                {% endif %}
+            </div>
+
+            <p style="font-size: 16px; color: #34495e;">We encourage you to review our seller guidelines and address the concerns mentioned above. Our aim is to ensure a high standard of quality for all sellers on our platform, and we value your understanding.</p>
 
             <div style="display: flex; justify-content: space-between; margin: 30px 0; flex-wrap: wrap;">
                 <div style="flex-basis: calc(33.333% - 20px); text-align: center; margin: 10px;">
