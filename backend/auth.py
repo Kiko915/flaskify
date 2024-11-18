@@ -250,7 +250,7 @@ def get_current_user():
 
     # Add seller information if user is a seller
     if current_user.role == 'Seller':
-        seller_info = SellerInfo.query.filter_by(user_uuid=current_user.user_uuid).first()
+        seller_info = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
         if seller_info:
             user_data['seller'] = {
                 'seller_id': seller_info.seller_id,
@@ -260,9 +260,9 @@ def get_current_user():
                 'business_phone': seller_info.business_phone,
                 'status': seller_info.status,
                 'total_sales': float(seller_info.total_sales) if seller_info.total_sales else 0.00,
-                'date_registered': seller_info.date_registered.isoformat(),
-                'last_updated': seller_info.last_updated.isoformat(),
-                'is_approved': seller_info.is_approved()
+                'date_registered': seller_info.submission_date.isoformat(),
+                'last_updated': seller_info.last_modified.isoformat(),
+                'is_approved': seller_info.approval_date is not None
             }
         else:
             user_data['seller'] = None

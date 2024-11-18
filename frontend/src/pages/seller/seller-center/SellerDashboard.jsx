@@ -205,7 +205,7 @@ export default function SellerDashboard() {
           )}
         </button>
         <div className="relative mb-4">
-          <GreetingTab username={user ? user.first_name : 'loading...'} />
+          <GreetingTab username={user ? user.first_name : 'loading...'} role={user ? user.role : 'loading...'} />
         </div>
         <div id="container">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6 motion-preset-slide-up-md">

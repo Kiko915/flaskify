@@ -3,9 +3,10 @@ import { useParams } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MapPin, Package, DollarSign, Star, Clock, Mail, Phone } from 'lucide-react';
+import { MapPin, Package, DollarSign, Star, Clock, Mail, Phone, Plus } from 'lucide-react';
 import { useAuth } from "@/utils/AuthContext";
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 export default function ShopDetail() {
     const { shopUuid } = useParams();
@@ -13,35 +14,57 @@ export default function ShopDetail() {
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
+    const navigate = useNavigate();
 
     useEffect(() => {
         const fetchShopDetails = async () => {
             try {
+                setLoading(true);
+                // Fetch shop details
                 const response = await fetch(`http://localhost:5555/seller/${user.seller.seller_id}/shops/${shopUuid}`, {
-                    credentials: 'include'
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
+                    }
                 });
 
                 if (!response.ok) {
+                    if (response.status === 404) {
+                        toast.error('Shop not found');
+                        return;
+                    }
                     throw new Error('Failed to fetch shop details');
                 }
 
                 const data = await response.json();
                 setShop(data.shop);
 
-                // Fetch products for this shop
-                const productsResponse = await fetch(`http://localhost:5555/seller/${user.seller.seller_id}/shops/${shopUuid}/products`, {
-                    credentials: 'include'
-                });
+                try {
+                    // Fetch products for this shop
+                    const productsResponse = await fetch(`http://localhost:5555/seller/${user.seller.seller_id}/shops/${shopUuid}/products`, {
+                        credentials: 'include',
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    });
 
-                if (!productsResponse.ok) {
-                    throw new Error('Failed to fetch products');
+                    if (productsResponse.ok) {
+                        const productsData = await productsResponse.json();
+                        setProducts(productsData.products || []);
+                    } else if (productsResponse.status === 404) {
+                        // If no products found, set empty array
+                        setProducts([]);
+                    } else {
+                        throw new Error('Failed to fetch products');
+                    }
+                } catch (productError) {
+                    console.error('Error fetching products:', productError);
+                    toast.error('Failed to load products');
+                    setProducts([]); // Set empty array on error
                 }
-
-                const productsData = await productsResponse.json();
-                setProducts(productsData.products || []);
             } catch (error) {
                 console.error('Error:', error);
-                toast.error('Failed to load shop details');
+                toast.error(error.message || 'Failed to load shop details');
             } finally {
                 setLoading(false);
             }
@@ -99,6 +122,14 @@ export default function ShopDetail() {
                                     </div>
                                 </div>
                             </div>
+                            {/* Add Product Button */}
+                            <Button 
+                                onClick={() => navigate(`/seller/seller-center/shop/${shopUuid}/products/new`)}
+                                className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                            >
+                                <Plus className="w-4 h-4 mr-2" />
+                                Add Product
+                            </Button>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                             <div className="flex items-center text-gray-600">
@@ -133,12 +164,16 @@ export default function ShopDetail() {
                     {products.length > 0 ? (
                         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
                             {products.map((product) => (
-                                <Card key={product.product_uuid} className="overflow-hidden">
+                                <Card 
+                                    key={product.product_uuid} 
+                                    className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+                                    onClick={() => navigate(`/seller/seller-center/shop/${shopUuid}/products/${product.product_uuid}`)}
+                                >
                                     <div className="aspect-square bg-gray-100 relative">
-                                        {product.product_images?.[0] ? (
+                                        {product.main_image ? (
                                             <img 
-                                                src={product.product_images[0]} 
-                                                alt={product.product_name}
+                                                src={product.main_image} 
+                                                alt={product.name}
                                                 className="w-full h-full object-cover"
                                             />
                                         ) : (
@@ -146,12 +181,21 @@ export default function ShopDetail() {
                                                 <Package className="w-12 h-12 text-gray-400" />
                                             </div>
                                         )}
+                                        {product.status !== 'active' && (
+                                            <div className="absolute top-2 right-2 bg-gray-800 text-white text-xs px-2 py-1 rounded">
+                                                {product.status}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="p-4">
-                                        <h3 className="font-semibold text-sm mb-2 line-clamp-2">{product.product_name}</h3>
+                                        <h3 className="font-semibold text-sm mb-2 line-clamp-2">{product.name}</h3>
                                         <div className="flex justify-between items-center">
-                                            <span className="text-orange-600 font-bold">${product.product_price.toFixed(2)}</span>
-                                            <span className="text-sm text-gray-500">Sold: {product.sold_count || 0}</span>
+                                            <span className="text-orange-600 font-bold">${Number(product.price).toFixed(2)}</span>
+                                            <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                                <span>Stock: {product.quantity}</span>
+                                                <span>•</span>
+                                                <span>Sold: {product.total_sales}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </Card>
@@ -162,7 +206,14 @@ export default function ShopDetail() {
                             <div className="text-center">
                                 <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                                 <h3 className="text-lg font-medium text-gray-900 mb-2">No Products Found</h3>
-                                <p className="text-gray-500">This shop hasn't added any products yet.</p>
+                                <p className="text-gray-500 mb-6">Get started by adding your first product to your shop.</p>
+                                <Button 
+                                    onClick={() => navigate(`/seller/seller-center/shop/${shopUuid}/products/new`)}
+                                    className="bg-yellow-500 hover:bg-yellow-600 text-white"
+                                >
+                                    <Plus className="w-4 h-4 mr-2" />
+                                    Add First Product
+                                </Button>
                             </div>
                         </Card>
                     )}

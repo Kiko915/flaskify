@@ -41,7 +41,7 @@ export default function SellersPage() {
 
   const fetchSellers = async () => {
     try {
-      const response = await fetch("http://localhost:5555/api/sellers", {
+      const response = await fetch("http://localhost:5555/sellers", {
         credentials: "include",
       });
       if (!response.ok) {

@@ -39,6 +39,7 @@ import ShopInfo from './pages/seller/seller-center/shop/ShopInfo.jsx';
 import NewShop from './pages/seller/seller-center/shop/NewShop.jsx';
 import EditShop from './pages/seller/seller-center/shop/EditShop.jsx';
 import ShopDetail from './pages/seller/seller-center/shop/ShopDetail.jsx';
+import AddProduct from './pages/seller/seller-center/shop/AddProduct.jsx';
 import Dashboard from "./pages/admin/dashboard/Dashboard";
 import UsersPage from './pages/admin/users/UsersPage';
 import SellersPage from './pages/admin/sellers/SellersPage.jsx';
@@ -163,6 +164,10 @@ const router = createBrowserRouter([
                   {
                     path: ":shopUuid/detail",
                     element: <ShopDetail />
+                  },
+                  {
+                    path: ":shopUuid/products/new",
+                    element: <AddProduct />
                   }
                 ]
               }

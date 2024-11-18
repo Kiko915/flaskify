@@ -39,6 +39,7 @@ import { CheckCircle, XCircle, Clock, Search, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from '@/utils/AuthContext';
 import { Separator } from '@/components/ui/separator';
+import { Eye } from 'lucide-react';
 
 const SellerVerifications = () => {
   const { user } = useAuth();
@@ -59,7 +60,8 @@ const SellerVerifications = () => {
     status: '',
     remarks: '',
     approved_by: user?.user_uuid,
-    violation_type: ''
+    violation_type: '',
+    rejection_reason: ''
   });
 
   const violationTypes = [
@@ -70,6 +72,15 @@ const SellerVerifications = () => {
     { value: 'policy', label: 'Policy Violations' },
     { value: 'fraud', label: 'Fraudulent Activity' },
     { value: 'other', label: 'Other Violations' }
+  ];
+
+  const rejectionReasons = [
+    { value: 'incomplete_docs', label: 'Incomplete Documentation' },
+    { value: 'invalid_docs', label: 'Invalid Documentation' },
+    { value: 'unclear_docs', label: 'Unclear or Unreadable Documents' },
+    { value: 'business_mismatch', label: 'Business Information Mismatch' },
+    { value: 'suspicious_activity', label: 'Suspicious Activity' },
+    { value: 'other', label: 'Other Reason' }
   ];
 
   const handleInputChange = (e) => {
@@ -87,7 +98,8 @@ const SellerVerifications = () => {
       status: type === 'approve' ? 'Approved' : type === 'reject' ? 'Rejected' : 'Suspended',
       remarks: '',
       approved_by: user?.user_uuid,
-      violation_type: ''
+      violation_type: '',
+      rejection_reason: ''
     });
   };
 
@@ -117,7 +129,8 @@ const SellerVerifications = () => {
         status: '',
         remarks: '',
         approved_by: user?.user_uuid,
-        violation_type: ''
+        violation_type: '',
+        rejection_reason: ''
       });
       setActionDialog({ type: null, sellerId: null, open: false });
       
@@ -129,6 +142,17 @@ const SellerVerifications = () => {
       // toast.error('Failed to update seller status');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleViewDocument = async (documentUrl) => {
+    if (!documentUrl) return;
+    
+    try {
+      // Open Cloudinary URL directly in a new tab
+      window.open(documentUrl, '_blank');
+    } catch (err) {
+      setError('Failed to view document: ' + err.message);
     }
   };
 
@@ -170,40 +194,6 @@ const SellerVerifications = () => {
       <Badge className={`${statusColors[status] || 'bg-gray-200'} text-white`}>
         {status || 'Unknown'}
       </Badge>
-    );
-  };
-
-  const SellerDetailsView = ({ seller }) => {
-    if (!seller) return null;
-
-    const detailFields = [
-      { label: "Business Owner", value: seller.business_owner },
-      { label: "Business Type", value: seller.business_type },
-      { label: "Tax ID", value: seller.tax_id },
-      { label: "BIR Certificate", value: seller.tax_certificate_doc },
-      { label: "Business Email", value: seller.business_email },
-      { label: "Business Phone", value: seller.business_phone },
-      { label: "Country", value: seller.business_country },
-      { label: "Province/State", value: seller.business_province },
-      { label: "City", value: seller.business_city },
-      { label: "Address", value: seller.business_address },
-      { label: "Total Sales", value: seller.total_sales },
-      { label: "Approval Date", value: seller.approval_date },
-    ];
-
-    return (
-      <div className="grid grid-cols-2 gap-4">
-        {detailFields.map((field, index) => (
-          <div key={index} className="space-y-1">
-            <p className="text-sm font-medium text-gray-500">{field.label}</p>
-            <p className="text-sm">{field.value || 'N/A'}</p>
-          </div>
-        ))}
-        <div className="col-span-2">
-          <p className="text-sm font-medium text-gray-500">Admin Notes</p>
-          <p className="text-sm whitespace-pre-wrap">{seller.admin_notes || 'No notes available'}</p>
-        </div>
-      </div>
     );
   };
 
@@ -285,7 +275,21 @@ const SellerVerifications = () => {
                       <TableCell>{seller.business_owner}</TableCell>
                       <TableCell>{seller.business_type}</TableCell>
                       <TableCell>{seller.tax_id ? seller.tax_id : "N/A"}</TableCell>
-                      <TableCell>{seller.tax_certificate_doc ? seller.tax_certificate_doc : "N/A"}</TableCell>
+                      <TableCell>
+                        {seller.bir_certificate ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewDocument(seller.bir_certificate)}
+                            className="flex items-center gap-2"
+                          >
+                            <Eye className="h-4 w-4" />
+                            View
+                          </Button>
+                        ) : (
+                          "N/A"
+                        )}
+                      </TableCell>
                       <TableCell>{getStatusBadge(seller.status)}</TableCell>
                       <TableCell className="text-sm">
                         {seller.submission_date
@@ -347,23 +351,15 @@ const SellerVerifications = () => {
         </CardContent>
       </Card>
 
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Seller Details</DialogTitle>
-            <DialogDescription>
-              Complete information about the seller
-            </DialogDescription>
-          </DialogHeader>
-          {detailsLoading ? (
-            <div className="flex justify-center items-center p-4">
-              <Loader2 className="h-6 w-6 animate-spin text-gray-500" />
-            </div>
-          ) : (
-            selectedSeller && <SellerDetailsView seller={selectedSeller} />
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Use the enhanced SellerDetailsDialog */}
+      <SellerDetailsDialog
+        seller={selectedSeller}
+        isOpen={isDialogOpen}
+        onClose={() => {
+          setIsDialogOpen(false);
+          setSelectedSeller(null);
+        }}
+      />
 
       <Dialog open={actionDialog.open} onOpenChange={() => setActionDialog({ type: null, sellerId: null, open: false })}>
         <DialogContent>
@@ -373,7 +369,11 @@ const SellerVerifications = () => {
                actionDialog.type === 'reject' ? 'Reject Seller' : 'Suspend Seller'}
             </DialogTitle>
             <DialogDescription>
-              {actionDialog.type === 'suspend' && 'Select the violation type and provide detailed comments about the suspension.'}
+              {actionDialog.type === 'suspend' 
+                ? 'Select the violation type and provide detailed comments about the suspension.'
+                : actionDialog.type === 'reject'
+                ? 'Select the reason for rejection and provide additional comments.'
+                : 'Provide any comments about the approval.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleActionSubmit}>
@@ -398,14 +398,38 @@ const SellerVerifications = () => {
                   </Select>
                 </div>
               )}
+              {actionDialog.type === 'reject' && (
+                <div className="space-y-2">
+                  <Label htmlFor="rejection_reason">Rejection Reason</Label>
+                  <Select
+                    value={formData.rejection_reason}
+                    onValueChange={(value) => setFormData({ ...formData, rejection_reason: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select rejection reason" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {rejectionReasons.map((reason) => (
+                        <SelectItem key={reason.value} value={reason.value}>
+                          {reason.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="remarks">Admin Comments</Label>
                 <Textarea
                   id="remarks"
                   name="remarks"
-                  placeholder={actionDialog.type === 'suspend' 
-                    ? "Provide detailed explanation of the violation and suspension..." 
-                    : "Enter your comments..."}
+                  placeholder={
+                    actionDialog.type === 'suspend' 
+                      ? "Provide detailed explanation of the violation and suspension..." 
+                      : actionDialog.type === 'reject'
+                      ? "Provide additional details about the rejection reason..."
+                      : "Enter your comments..."
+                  }
                   value={formData.remarks}
                   onChange={handleInputChange}
                   required
@@ -423,7 +447,11 @@ const SellerVerifications = () => {
               <Button 
                 variant={actionDialog.type === 'approve' ? 'default' : 'destructive'} 
                 type="submit" 
-                disabled={loading || (actionDialog.type === 'suspend' && !formData.violation_type)}
+                disabled={
+                  loading || 
+                  (actionDialog.type === 'suspend' && !formData.violation_type) ||
+                  (actionDialog.type === 'reject' && !formData.rejection_reason)
+                }
               >
                 {loading ? 'Processing...' : 'Confirm'}
               </Button>

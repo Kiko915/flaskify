@@ -102,18 +102,18 @@ def add_seller():
 
         # Create new seller instance
         new_seller = SellerInfo(
-            user_id=current_user.user_uuid,  # Changed to match the model field
-            business_name=owner_name,  # Added missing field
+            user_id=current_user.user_uuid,  # Use user_id as per model
+            business_name=owner_name,
             business_owner=owner_name,
             business_type=data.get('sellerType'),
             business_email=business_email,
             business_phone=data.get('phNum'),
-            tax_id=data.get('tinNumber') if has_tin else None,
+            business_country=data.get('country'),
+            business_province=data.get('province'),
+            business_city=data.get('city'),
+            business_address=data.get('address'),
+            tax_id=data.get('taxId') if has_tin else None,
             tax_certificate_doc=bir_certificate_url,
-            business_country="Philippines",  # Added required fields
-            business_province="",
-            business_city="",
-            business_address="",
             status='Pending'
         )
 
@@ -224,7 +224,7 @@ def check_status():
 @role_required([Role.ADMIN, Role.SELLER])
 def update_seller(seller_id):
     seller = SellerInfo.query.get(seller_id)
-    if not seller or seller.user_uuid != current_user.user_uuid:
+    if not seller or seller.user_id != current_user.user_uuid:
         return jsonify({"error": "Seller not found or access denied"}), 404
     
     data = request.get_json()
@@ -271,6 +271,11 @@ def update_seller_status(seller_id):
         
         if new_status == 'Approved':
             seller.approval_date = datetime.now()
+            # Update user role to Seller
+            user = Users.query.get(seller.user_id)  # Use user_id as per model
+            if user:
+                user.role = Role.SELLER  # Use role as per Users model
+                db.session.add(user)
         elif new_status == 'Suspended':
             if not violation_type:
                 return jsonify({'error': 'Violation type is required for suspension'}), 400
@@ -321,7 +326,7 @@ def get_seller_shops(seller_id):
         if not seller:
             return jsonify({"error": "Seller not found"}), 404
         
-        if seller.user_uuid != current_user.user_uuid and current_user.role != Role.ADMIN:
+        if seller.user_id != current_user.user_uuid and current_user.role != Role.ADMIN:
             return jsonify({"error": "Access denied"}), 403
 
         # Build the query
@@ -386,7 +391,7 @@ def create_shop(seller_id):
         if not seller:
             return jsonify({"error": "Seller not found"}), 404
         
-        if seller.user_uuid != current_user.user_uuid and current_user.role != Role.ADMIN:
+        if seller.user_id != current_user.user_uuid and current_user.role != Role.ADMIN:
             return jsonify({"error": "Access denied"}), 403
 
         # Verify seller is approved
@@ -489,7 +494,7 @@ def update_shop(seller_id, shop_uuid):
             return jsonify({"error": "Shop not found"}), 404
 
         # Verify user has permission
-        if shop.seller.user_uuid != current_user.user_uuid and current_user.role != Role.ADMIN:
+        if shop.seller_info.user_id != current_user.user_uuid and current_user.role != Role.ADMIN:
             return jsonify({"error": "Access denied"}), 403
 
         # Get form data
@@ -598,7 +603,7 @@ def archive_shop(seller_id, shop_uuid):
             return jsonify({"message": "Shop not found"}), 404
 
         # Check if user has permission (must be the shop owner)
-        if current_user.user_uuid != shop.seller.user_uuid:
+        if current_user.user_uuid != shop.seller_info.user_id:
             return jsonify({"message": "Unauthorized to archive this shop"}), 403
 
         # Archive or unarchive the shop
@@ -625,7 +630,7 @@ def get_shop_details(seller_id, shop_uuid):
     try:
         # Check if the seller exists and the current user has access
         seller = SellerInfo.query.get(seller_id)
-        if not seller or (seller.user_uuid != current_user.user_uuid and not current_user.has_role(Role.ADMIN)):
+        if not seller or (seller.user_id != current_user.user_uuid and not current_user.has_role(Role.ADMIN)):
             return jsonify({"message": "Seller not found or access denied"}), 404
 
         # Get the shop
@@ -650,9 +655,9 @@ def get_shop_details(seller_id, shop_uuid):
                 "created_at": shop.date_created.isoformat(),
                 "last_updated": shop.last_updated.isoformat(),
                 # Get seller contact info
-                "business_email": shop.seller.business_email,
-                "business_phone": shop.seller.business_phone,
-                "business_type": shop.seller.business_type
+                "business_email": shop.seller_info.business_email,
+                "business_phone": shop.seller_info.business_phone,
+                "business_type": shop.seller_info.business_type
             }
         }), 200
 

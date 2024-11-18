@@ -287,6 +287,108 @@ class Shop(db.Model):
         """
         return self.seller_info.status == 'Approved' and not self.is_archived
 
+class Product(db.Model):
+    __tablename__ = 'products'
+    
+    # Primary Key
+    product_uuid = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    
+    # Foreign Keys
+    shop_uuid = db.Column(db.String(36), db.ForeignKey('shops.shop_uuid'), nullable=False)
+    seller_id = db.Column(db.String(36), db.ForeignKey('seller_info.seller_id'), nullable=False)
+    
+    # Basic Product Information
+    name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
+    compare_at_price = db.Column(db.Numeric(10, 2), nullable=True)  # Original price for showing discounts
+    
+    # Inventory Information
+    sku = db.Column(db.String(50), unique=True, nullable=True)
+    barcode = db.Column(db.String(50), unique=True, nullable=True)
+    quantity = db.Column(db.Integer, default=0)
+    low_stock_alert = db.Column(db.Integer, default=5)
+    
+    # Product Details
+    brand = db.Column(db.String(100), nullable=True)
+    category = db.Column(db.String(100), nullable=False)
+    subcategory = db.Column(db.String(100), nullable=True)
+    tags = db.Column(db.String(255), nullable=True)  # Comma-separated tags
+    
+    # Media
+    main_image = db.Column(db.String(255), nullable=True)  # URL to main product image
+    additional_images = db.Column(db.JSON, nullable=True)  # List of additional image URLs
+    
+    # Product Status
+    status = db.Column(db.Enum('draft', 'active', 'archived', name='product_status'), default='draft')
+    visibility = db.Column(db.Boolean, default=True)  # Whether product is visible to customers
+    featured = db.Column(db.Boolean, default=False)  # Whether product should be featured
+    
+    # SEO
+    meta_title = db.Column(db.String(255), nullable=True)
+    meta_description = db.Column(db.Text, nullable=True)
+    
+    # Shipping
+    weight = db.Column(db.Float, nullable=True)  # Weight in kg
+    width = db.Column(db.Float, nullable=True)   # Dimensions in cm
+    height = db.Column(db.Float, nullable=True)
+    length = db.Column(db.Float, nullable=True)
+    
+    # Stats
+    total_sales = db.Column(db.Integer, default=0)
+    total_revenue = db.Column(db.Numeric(10, 2), default=0.00)
+    view_count = db.Column(db.Integer, default=0)
+    
+    # Timestamps
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    shop = db.relationship('Shop', backref=db.backref('products', lazy=True))
+    seller = db.relationship('SellerInfo', backref=db.backref('products', lazy=True))
+    
+    def __repr__(self):
+        return f'<Product {self.name}>'
+    
+    def to_dict(self):
+        """Convert product to dictionary representation"""
+        return {
+            'product_uuid': self.product_uuid,
+            'shop_uuid': self.shop_uuid,
+            'seller_id': self.seller_id,
+            'name': self.name,
+            'description': self.description,
+            'price': float(self.price),
+            'compare_at_price': float(self.compare_at_price) if self.compare_at_price else None,
+            'sku': self.sku,
+            'barcode': self.barcode,
+            'quantity': self.quantity,
+            'low_stock_alert': self.low_stock_alert,
+            'brand': self.brand,
+            'category': self.category,
+            'subcategory': self.subcategory,
+            'tags': self.tags.split(',') if self.tags else [],
+            'main_image': self.main_image,
+            'additional_images': self.additional_images or [],
+            'status': self.status,
+            'visibility': self.visibility,
+            'featured': self.featured,
+            'meta_title': self.meta_title,
+            'meta_description': self.meta_description,
+            'weight': self.weight,
+            'dimensions': {
+                'width': self.width,
+                'height': self.height,
+                'length': self.length
+            } if all([self.width, self.height, self.length]) else None,
+            'stats': {
+                'total_sales': self.total_sales,
+                'total_revenue': float(self.total_revenue),
+                'view_count': self.view_count
+            },
+            'created_at': self.created_at.isoformat(),
+            'updated_at': self.updated_at.isoformat()
+        }
 
 class AdminInfo(db.Model):
     __tablename__ = 'admin_info'
