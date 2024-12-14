@@ -56,7 +56,7 @@ export function NavUser({
                 <span className="truncate font-semibold">{user.name}</span>
                 <span className="truncate text-xs">{user.email}</span>
               </div>
-              {user.role === "Admin" && <span><Badge className="text-xs bg-yellow-600 hover:bg-yellow-500"><Sparkle className='w-4 mr-1' /> Admin</Badge></span>}
+              {user.role === "ADMIN" && <span><Badge className="text-xs bg-yellow-600 hover:bg-yellow-500"><Sparkle className='w-4 mr-1' /> Admin</Badge></span>}
               <ChevronsUpDown className="ml-auto size-4" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>

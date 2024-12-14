@@ -1,11 +1,10 @@
 from flask import request, jsonify, Blueprint, send_from_directory
 from flask_login import login_required, current_user
-from datetime import datetime
-from sqlalchemy import or_
-from models import SellerInfo, Shop, db, Users, Role  
-from utils.emails import send_seller_approval_email, send_seller_rejection_email, send_seller_suspension_email
+from datetime import datetime, timedelta
+from sqlalchemy import or_, func, distinct
+from models import SellerInfo, Shop, db, Users, Role, Order, Product, OrderItem, ProductVariationOption  
+from utils.emails import send_seller_approval_email, send_seller_rejection_email, send_seller_suspension_email, send_order_cancellation_email
 from utils.auth_utils import role_required
-from utils.ocr_utils import verify_bir_certificate
 from utils.file_utils import verify_image_file
 import cloudinary.uploader
 import os
@@ -25,6 +24,13 @@ def check_existing_seller(owner_name, email):
     ).first()
 
     if existing_seller:
+        # If seller exists but was rejected, allow them to register again
+        if existing_seller.status == 'Rejected':
+            # Delete the rejected seller entry
+            db.session.delete(existing_seller)
+            db.session.commit()
+            return False, None
+            
         if existing_seller.business_owner.lower() == owner_name.lower():
             return True, "A seller with this owner name already exists"
         if existing_seller.business_email == email:
@@ -36,9 +42,10 @@ def check_existing_seller(owner_name, email):
 @login_required
 def add_seller():
     try:
-        # Retrieve form data
-        data = request.form.to_dict()
-        owner_name = data.get('ownerName')  # Use owner name for checking
+        # Get JSON data
+        data = request.get_json()
+        
+        owner_name = data.get('owner_name')
         business_email = data.get('email')
 
         if not owner_name or not business_email:
@@ -50,70 +57,22 @@ def add_seller():
             return jsonify({
                 "message": error_message,
                 "error": "duplicate_entry"
-            }), 409  # 409 Conflict status code
-
-        has_tin = data.get('hasTIN') == 'true'
-        bir_certificate = request.files.get('birCertificate')
-
-        # Upload BIR certificate to Cloudinary if provided
-        bir_certificate_url = None
-        if bir_certificate:
-            try:
-                # First validate the image file format and quality
-                file_content = bir_certificate.read()
-                is_valid_image, image_error = verify_image_file(file_content)
-                if not is_valid_image:
-                    return jsonify({
-                        "message": "Invalid BIR certificate image",
-                        "error": image_error,
-                        "error_type": "invalid_image"
-                    }), 400
-                
-                # Reset file pointer after reading
-                bir_certificate.seek(0)
-                
-                # Now validate the BIR certificate content using OCR
-                is_valid_bir, bir_error, viz_path = verify_bir_certificate(file_content)
-                if not is_valid_bir:
-                    return jsonify({
-                        "message": "Invalid BIR certificate content",
-                        "error": bir_error,
-                        "error_type": "invalid_content",
-                        "visualization": viz_path
-                    }), 400
-                    
-                # Reset file pointer again before upload
-                bir_certificate.seek(0)
-                
-                # Upload to Cloudinary
-                upload_result = cloudinary.uploader.upload(
-                    bir_certificate,
-                    folder="bir_certificates",
-                    resource_type="auto",  # Changed to auto to handle different file types
-                    allowed_formats=["pdf", "png", "jpg", "jpeg"]
-                )
-                bir_certificate_url = upload_result['secure_url']
-            except Exception as e:
-                print(f"Error processing file: {str(e)}")  # Add debugging
-                return jsonify({
-                    "message": "Failed to process BIR certificate",
-                    "error": str(e)
-                }), 400
+            }), 409
 
         # Create new seller instance
         new_seller = SellerInfo(
-            user_id=current_user.user_uuid,  # Use user_id as per model
-            business_name=owner_name,
+            user_id=current_user.user_uuid,
+            business_name=data.get('business_name'),
             business_owner=owner_name,
-            business_type=data.get('sellerType'),
+            business_type=data.get('business_type'),
             business_email=business_email,
-            business_phone=data.get('phNum'),
-            business_country=data.get('country'),
-            business_province=data.get('province'),
-            business_city=data.get('city'),
-            business_address=data.get('address'),
-            tax_id=data.get('taxId') if has_tin else None,
-            tax_certificate_doc=bir_certificate_url,
+            business_phone=data.get('phone'),
+            business_country=data.get('business_country'),
+            business_province=data.get('business_province'),
+            business_city=data.get('business_city'),
+            business_address=data.get('business_address'),
+            tax_id=data.get('tax_id'),
+            tax_certificate_doc=data.get('bir_certificate_url'),
             status='Pending'
         )
 
@@ -128,7 +87,7 @@ def add_seller():
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error in add_seller: {str(e)}")  # Add debugging
+        print(f"Error in add_seller: {str(e)}")
         return jsonify({
             "message": "Failed to register seller",
             "error": str(e)
@@ -173,7 +132,12 @@ def get_all_sellers():
             "tax_id": seller.tax_id,
             "bir_certificate": seller.tax_certificate_doc,
             "approval_date": seller.approval_date,
-            "remarks": seller.remarks
+            "remarks": seller.remarks,
+            "business_country": seller.business_country,
+            "business_region": seller.business_region,
+            "business_province": seller.business_province,
+            "business_city": seller.business_city,
+            "business_address": seller.business_address
         }
         
         # Get admin name if approved_by exists
@@ -624,45 +588,86 @@ def archive_shop(seller_id, shop_uuid):
             "error": str(e)
         }), 500
 
-@seller.route('/seller/<string:seller_id>/shops/<string:shop_uuid>', methods=['GET'])
-@login_required
-def get_shop_details(seller_id, shop_uuid):
+@seller.route('/shop/<string:shop_uuid>', methods=['GET'])
+def get_shop_details(shop_uuid):
     try:
-        # Check if the seller exists and the current user has access
-        seller = SellerInfo.query.get(seller_id)
-        if not seller or (seller.user_id != current_user.user_uuid and not current_user.has_role(Role.ADMIN)):
-            return jsonify({"message": "Seller not found or access denied"}), 404
+        # Get the shop with seller info
+        shop = Shop.query.options(
+            db.joinedload(Shop.seller_info)
+        ).filter_by(shop_uuid=shop_uuid).first_or_404()
 
-        # Get the shop
-        shop = Shop.query.filter_by(shop_uuid=shop_uuid, seller_id=seller_id).first()
-        if not shop:
-            return jsonify({"message": "Shop not found"}), 404
+        # Get shop's active products
+        products = Product.query.filter(
+            Product.shop_uuid == shop_uuid,
+            Product.status == 'active',
+            Product.visibility == True
+        ).all()
 
-        # Return shop details
-        return jsonify({
-            "shop": {
-                "shop_uuid": shop.shop_uuid,
-                "business_name": shop.business_name,
-                "business_address": shop.business_address,
-                "business_city": shop.business_city,
-                "business_province": shop.business_province,
-                "business_country": shop.business_country,
-                "shop_logo": shop.shop_logo,
-                "total_products": shop.total_products,
-                "shop_sales": float(shop.shop_sales),
-                "is_archived": shop.is_archived,
-                "archived_at": shop.archived_at.isoformat() if shop.archived_at else None,
-                "created_at": shop.date_created.isoformat(),
-                "last_updated": shop.last_updated.isoformat(),
-                # Get seller contact info
-                "business_email": shop.seller_info.business_email,
-                "business_phone": shop.seller_info.business_phone,
-                "business_type": shop.seller_info.business_type
-            }
-        }), 200
+        # Calculate shop statistics
+        total_products = len(products)
+        total_sales = sum(product.total_sales for product in products)
+        avg_rating = 4.5  # TODO: Implement actual rating calculation
+
+        # Format response
+        response = {
+            'shop_uuid': shop.shop_uuid,
+            'business_name': shop.business_name,
+            'business_city': shop.business_city,
+            'business_province': shop.business_province,
+            'business_address': shop.business_address,
+            'shop_logo': shop.shop_logo,
+            'total_products': total_products,
+            'total_sales': total_sales,
+            'avg_rating': avg_rating,
+            'date_created': shop.date_created.isoformat() if shop.date_created else None,
+            'seller': {
+                'seller_id': shop.seller_info.seller_id,
+                'business_type': shop.seller_info.business_type,
+                'status': shop.seller_info.status
+            },
+            'products': [{
+                'product_uuid': product.product_uuid,
+                'name': product.name,
+                'price': float(product.price),
+                'compare_at_price': float(product.compare_at_price) if product.compare_at_price else None,
+                'main_image': product.main_image,
+                'total_sales': product.total_sales,
+                'quantity': product.quantity
+            } for product in products]
+        }
+
+        return jsonify(response), 200
 
     except Exception as e:
-        return jsonify({"message": "Failed to fetch shop details", "error": str(e)}), 500
+        print(f"Error getting shop details: {str(e)}")
+        return jsonify({"message": str(e)}), 500
+
+@seller.route('/seller/current', methods=['GET'])
+@login_required
+def get_current_seller():
+    try:
+        # Get seller info for current user
+        seller_info = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
+        
+        if not seller_info:
+            return jsonify({
+                "message": "No seller information found for current user"
+            }), 404
+            
+        return jsonify({
+            "seller_id": seller_info.seller_id,
+            "business_name": seller_info.business_name,
+            "business_owner": seller_info.business_owner,
+            "business_email": seller_info.business_email,
+            "status": seller_info.status,
+            "user_id": seller_info.user_id
+        }), 200
+            
+    except Exception as e:
+        return jsonify({
+            "message": "Failed to fetch current seller information",
+            "error": str(e)
+        }), 500
 
 def send_suspension_email(email, business_owner, remarks, violation_type):
     subject = "Account Suspension Notice - Flaskify Seller Account"
@@ -701,3 +706,528 @@ def send_suspension_email(email, business_owner, remarks, violation_type):
     """
     
     send_email(email, subject, body)
+
+@seller.route('/api/seller/orders', methods=['GET'])
+@login_required
+@role_required(Role.SELLER)
+def get_seller_orders():
+    try:
+        # Get the seller info for the current user
+        seller = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
+        if not seller:
+            return jsonify({
+                'status': 'error',
+                'message': 'Seller not found'
+            }), 404
+
+        # Get all products for this seller
+        seller_products = Product.query.filter_by(seller_id=seller.seller_id).all()
+        product_uuids = [p.product_uuid for p in seller_products]
+
+        # Get all order items containing seller's products
+        order_items = OrderItem.query.filter(OrderItem.product_uuid.in_(product_uuids)).all()
+        order_uuids = list(set([item.order_uuid for item in order_items]))
+
+        # Get the full orders
+        orders = Order.query.filter(Order.order_uuid.in_(order_uuids)).all()
+        
+        # Format orders with customer info
+        formatted_orders = []
+        for order in orders:
+            # Get customer info
+            customer = Users.query.get(order.user_uuid)
+            
+            # Filter order items to only include this seller's products
+            seller_items = [item for item in order.items 
+                          if item.product_uuid in product_uuids]
+            
+            # Calculate subtotal for seller's items
+            seller_subtotal = sum(float(item.subtotal) for item in seller_items)
+            
+            formatted_order = order.to_dict()
+            formatted_order['items'] = [item.to_dict() for item in seller_items]
+            formatted_order['subtotal'] = seller_subtotal
+            formatted_order['customer_name'] = f"{customer.first_name} {customer.last_name}"
+            formatted_order['customer_email'] = customer.email
+            formatted_order['customer_phone'] = customer.phone
+
+            formatted_orders.append(formatted_order)
+
+        return jsonify({
+            'status': 'success',
+            'orders': formatted_orders
+        })
+
+    except Exception as e:
+        print(f"Error getting seller orders: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to fetch orders'
+        }), 500
+
+@seller.route('/api/seller/orders/<order_uuid>/update-status', methods=['POST'])
+@login_required
+@role_required(Role.SELLER)
+def update_order_status(order_uuid):
+    try:
+        data = request.get_json()
+        new_status = data.get('status')
+        
+        if not new_status:
+            return jsonify({
+                'status': 'error',
+                'message': 'New status is required'
+            }), 400
+
+        # Get the order
+        order = Order.query.get(order_uuid)
+        if not order:
+            return jsonify({
+                'status': 'error',
+                'message': 'Order not found'
+            }), 404
+
+        # Verify seller owns the products in this order
+        seller = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
+        seller_products = Product.query.filter_by(seller_id=seller.seller_id).all()
+        product_uuids = [p.product_uuid for p in seller_products]
+        
+        # Check if any order items belong to this seller
+        seller_items = [item for item in order.items 
+                       if item.product_uuid in product_uuids]
+        if not seller_items:
+            return jsonify({
+                'status': 'error',
+                'message': 'Order does not contain any of your products'
+            }), 403
+
+        # Update status based on the request
+        if new_status == 'shipped':
+            if not order.paid_at:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Cannot ship an unpaid order'
+                }), 400
+            order.shipped_at = datetime.utcnow()
+            order.status = 'to_ship'  # Update status to 'to_ship' for buyer view
+        elif new_status == 'delivered':
+            if not order.shipped_at:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Cannot mark as delivered before shipping'
+                }), 400
+            order.delivered_at = datetime.utcnow()
+            order.status = 'completed'
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid status update'
+            }), 400
+
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'message': f'Order status updated to {new_status}'
+        })
+
+    except Exception as e:
+        print(f"Error updating order status: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to update order status'
+        }), 500
+
+@seller.route('/api/seller/orders/<order_uuid>/cancel', methods=['POST'])
+@login_required
+@role_required(Role.SELLER)
+def cancel_seller_order(order_uuid):
+    try:
+        data = request.get_json()
+        cancellation_reason = data.get('reason')
+        
+        if not cancellation_reason:
+            return jsonify({
+                'status': 'error',
+                'message': 'Cancellation reason is required'
+            }), 400
+
+        # Get the order
+        order = Order.query.get(order_uuid)
+        if not order:
+            return jsonify({
+                'status': 'error',
+                'message': 'Order not found'
+            }), 404
+
+        # Verify seller owns the products in this order
+        seller = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
+        seller_products = Product.query.filter_by(seller_id=seller.seller_id).all()
+        product_uuids = [p.product_uuid for p in seller_products]
+        
+        # Check if any order items belong to this seller
+        seller_items = [item for item in order.items 
+                       if item.product_uuid in product_uuids]
+        if not seller_items:
+            return jsonify({
+                'status': 'error',
+                'message': 'Order does not contain any of your products'
+            }), 403
+
+        # Check if order can be cancelled
+        if order.shipped_at or order.delivered_at or order.status == 'cancelled':
+            return jsonify({
+                'status': 'error',
+                'message': 'Order cannot be cancelled in its current state'
+            }), 400
+
+        # Update order status
+        order.status = 'cancelled'
+        order.cancelled_at = datetime.utcnow()
+        order.cancellation_reason = cancellation_reason
+        order.cancelled_by = 'seller'
+
+        # Restore inventory for seller's items
+        for item in seller_items:
+            product = Product.query.get(item.product_uuid)
+            if product:
+                if item.variation_uuid and item.selected_option:
+                    # Restore variation option stock
+                    option = ProductVariationOption.query.filter_by(
+                        variation_uuid=item.variation_uuid,
+                        value=item.selected_option['value']
+                    ).first()
+                    if option:
+                        option.stock += item.quantity
+                else:
+                    # Restore main product stock
+                    product.quantity += item.quantity
+                
+                # Update product stats
+                product.total_sales -= item.quantity
+                # Convert Decimal to float before subtraction
+                current_revenue = float(product.total_revenue or 0)
+                item_total = float(item.unit_price) * item.quantity
+                product.total_revenue = current_revenue - item_total
+
+        # Get customer email
+        customer = Users.query.get(order.user_uuid)
+        if customer:
+            try:
+                # Send cancellation email to customer
+                send_order_cancellation_email(order, customer.email)
+            except Exception as e:
+                print(f"Failed to send cancellation email: {str(e)}")
+                # Continue with order cancellation even if email fails
+
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'message': 'Order cancelled successfully'
+        })
+
+    except Exception as e:
+        print(f"Error cancelling order: {str(e)}")
+        db.session.rollback()
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to cancel order'
+        }), 500
+
+@seller.route('/api/seller/orders/<order_uuid>/handle-cancellation', methods=['POST'])
+@login_required
+@role_required(Role.SELLER)
+def handle_cancellation_request(order_uuid):
+    """Handle order cancellation request (approve/reject)"""
+    try:
+        data = request.get_json()
+        action = data.get('action')  # 'approve' or 'reject'
+        rejection_reason = data.get('rejection_reason')  # required if action is 'reject'
+        
+        if not action or action not in ['approve', 'reject']:
+            return jsonify({
+                'status': 'error',
+                'message': 'Invalid action'
+            }), 400
+            
+        if action == 'reject' and not rejection_reason:
+            return jsonify({
+                'status': 'error',
+                'message': 'Rejection reason is required'
+            }), 400
+
+        # Get the order
+        order = Order.query.get(order_uuid)
+        if not order:
+            return jsonify({
+                'status': 'error',
+                'message': 'Order not found'
+            }), 404
+
+        # Verify seller owns the products in this order
+        seller = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
+        seller_products = Product.query.filter_by(seller_id=seller.seller_id).all()
+        product_uuids = [p.product_uuid for p in seller_products]
+        
+        # Check if any order items belong to this seller
+        seller_items = [item for item in order.items 
+                       if item.product_uuid in product_uuids]
+        if not seller_items:
+            return jsonify({
+                'status': 'error',
+                'message': 'Order does not contain any of your products'
+            }), 403
+
+        # Verify order is in cancellation_pending state
+        if order.status != 'cancellation_pending':
+            return jsonify({
+                'status': 'error',
+                'message': 'Order is not pending cancellation'
+            }), 400
+
+        if action == 'approve':
+            # Update order status
+            order.status = 'cancelled'
+            order.payment_status = 'cancelled'
+            order.cancelled_at = datetime.utcnow()
+            order.cancellation_approved_at = datetime.utcnow()
+            
+            # Restore inventory and update sales metrics for all items
+            for item in seller_items:
+                product = Product.query.get(item.product_uuid)
+                if product:
+                    # Restore inventory based on variation or main product
+                    if item.variation_uuid and item.selected_option:
+                        # Restore variation option stock
+                        option = ProductVariationOption.query.filter_by(
+                            variation_uuid=item.variation_uuid,
+                            value=item.selected_option['value']
+                        ).first()
+                        if option:
+                            option.stock += item.quantity
+                    else:
+                        # Restore main product stock
+                        product.quantity += item.quantity
+                    
+                    # Update sales metrics if order was paid
+                    if order.paid_at:
+                        # Deduct from total sales count
+                        product.total_sales = max(0, product.total_sales - item.quantity)
+                        
+                        # Deduct from total revenue
+                        current_revenue = float(product.total_revenue or 0)
+                        item_total = float(item.unit_price) * item.quantity
+                        product.total_revenue = max(0, current_revenue - item_total)
+
+            message = 'Cancellation request approved'
+        else:
+            # Reject cancellation
+            order.status = order.status.replace('cancellation_pending', 'paid' if order.paid_at else 'pending')
+            order.cancellation_rejected_at = datetime.utcnow()
+            order.cancellation_rejected_reason = rejection_reason
+            message = 'Cancellation request rejected'
+
+        db.session.commit()
+
+        return jsonify({
+            'status': 'success',
+            'message': message
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error handling cancellation request: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'Failed to handle cancellation request'
+        }), 500
+
+@seller.route('/seller/dashboard/stats', methods=['GET'])
+@login_required
+def get_seller_dashboard_stats():
+    try:
+        # Verify user is a seller
+        if current_user.role != Role.SELLER:
+            return jsonify({'error': 'Unauthorized - Seller access only'}), 403
+
+        # Get seller info
+        seller_info = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
+        if not seller_info:
+            return jsonify({'error': 'Seller information not found'}), 404
+
+        # Get seller's shops
+        shops = Shop.query.filter_by(seller_id=seller_info.seller_id).all()
+        shop_ids = [shop.shop_uuid for shop in shops]
+
+        # Calculate total revenue from completed orders
+        total_revenue = 0
+        total_orders = 0
+        daily_revenue = {}
+        monthly_revenue = {}
+        monthly_orders = {}
+
+        # Get all completed orders for this seller's products for the last 12 months
+        twelve_months_ago = datetime.now() - timedelta(days=365)
+        completed_orders = db.session.query(Order).join(
+            OrderItem, Order.order_uuid == OrderItem.order_uuid
+        ).join(
+            Product, OrderItem.product_uuid == Product.product_uuid
+        ).filter(
+            Product.shop_uuid.in_(shop_ids),
+            Order.status.in_(['completed', 'delivered']),
+            Order.created_at >= twelve_months_ago
+        ).order_by(Order.created_at.asc()).all()
+
+        # Calculate totals and breakdowns
+        for order in completed_orders:
+            # Only count items from this seller's shops
+            order_total = sum(
+                float(item.subtotal)
+                for item in order.items
+                if item.product.shop_uuid in shop_ids
+            )
+            
+            total_revenue += order_total
+            total_orders += 1
+
+            # Get date keys for breakdowns
+            date_key = order.created_at.strftime('%Y-%m-%d')
+            month_key = order.created_at.strftime('%Y-%m')
+            
+            # Update daily revenue
+            daily_revenue[date_key] = daily_revenue.get(date_key, 0) + order_total
+            
+            # Update monthly breakdowns
+            monthly_revenue[month_key] = monthly_revenue.get(month_key, 0) + order_total
+            monthly_orders[month_key] = monthly_orders.get(month_key, 0) + 1
+
+        # Get total products
+        total_products = Product.query.filter(
+            Product.shop_uuid.in_(shop_ids),
+            Product.visibility == True
+        ).count()
+
+        # Get total customers (unique buyers)
+        total_customers = db.session.query(func.count(distinct(Order.user_uuid))).join(
+            OrderItem, Order.order_uuid == OrderItem.order_uuid
+        ).join(
+            Product, OrderItem.product_uuid == Product.product_uuid
+        ).filter(
+            Product.shop_uuid.in_(shop_ids)
+        ).scalar()
+
+        # Calculate trends
+        current_month = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_month = (current_month - timedelta(days=1)).replace(day=1)
+        
+        # Revenue trend
+        current_month_revenue = monthly_revenue.get(current_month.strftime('%Y-%m'), 0)
+        last_month_revenue = monthly_revenue.get(last_month.strftime('%Y-%m'), 0)
+        revenue_trend = calculate_trend(current_month_revenue, last_month_revenue)
+
+        # Orders trend
+        current_month_orders = monthly_orders.get(current_month.strftime('%Y-%m'), 0)
+        last_month_orders = monthly_orders.get(last_month.strftime('%Y-%m'), 0)
+        orders_trend = calculate_trend(current_month_orders, last_month_orders)
+
+        # Products trend
+        current_products = total_products
+        last_month_products = Product.query.filter(
+            Product.shop_uuid.in_(shop_ids),
+            Product.visibility == True,
+            Product.created_at < last_month
+        ).count()
+        products_trend = calculate_trend(current_products, last_month_products)
+
+        # Customers trend
+        current_month_customers = db.session.query(func.count(distinct(Order.user_uuid))).join(
+            OrderItem, Order.order_uuid == OrderItem.order_uuid
+        ).join(
+            Product, OrderItem.product_uuid == Product.product_uuid
+        ).filter(
+            Product.shop_uuid.in_(shop_ids),
+            Order.created_at >= current_month
+        ).scalar()
+
+        last_month_customers = db.session.query(func.count(distinct(Order.user_uuid))).join(
+            OrderItem, Order.order_uuid == OrderItem.order_uuid
+        ).join(
+            Product, OrderItem.product_uuid == Product.product_uuid
+        ).filter(
+            Product.shop_uuid.in_(shop_ids),
+            Order.created_at >= last_month,
+            Order.created_at < current_month
+        ).scalar()
+        customers_trend = calculate_trend(current_month_customers, last_month_customers)
+
+        # Prepare revenue data for charts (last 30 days)
+        today = datetime.now().date()
+        thirty_days_ago = today - timedelta(days=30)
+        
+        revenue_data = []
+        current_date = thirty_days_ago
+        
+        while current_date <= today:
+            date_str = current_date.strftime('%Y-%m-%d')
+            revenue_amount = daily_revenue.get(date_str, 0)
+            
+            revenue_data.append({
+                'date': date_str,
+                'amount': round(revenue_amount, 2),
+                'formattedAmount': f"₱{revenue_amount:,.2f}",
+                'day': current_date.strftime('%d'),
+                'month': current_date.strftime('%b'),
+                'dayOfWeek': current_date.strftime('%a')
+            })
+            
+            current_date += timedelta(days=1)
+
+        # Calculate sales distribution
+        sales_distribution = calculate_sales_distribution(completed_orders, shop_ids)
+
+        stats = {
+            'totalRevenue': float(total_revenue),
+            'totalOrders': total_orders,
+            'totalProducts': total_products,
+            'totalCustomers': total_customers,
+            'trends': {
+                'revenue': revenue_trend,
+                'orders': orders_trend,
+                'products': products_trend,
+                'customers': customers_trend
+            },
+            'revenueData': revenue_data,
+            'salesDistribution': sales_distribution
+        }
+
+        return jsonify(stats), 200
+
+    except Exception as e:
+        print(f"Error getting seller dashboard stats: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+def calculate_trend(current, previous):
+    """Calculate percentage change between two periods"""
+    if previous == 0:
+        return 100 if current > 0 else 0
+    return round(((current - previous) / previous) * 100, 1)
+
+def calculate_sales_distribution(orders, shop_ids):
+    """Calculate sales distribution by product category"""
+    category_sales = {}
+    
+    for order in orders:
+        for item in order.items:
+            if item.product.shop_uuid in shop_ids:
+                category_name = item.product.category.name
+                category_sales[category_name] = category_sales.get(category_name, 0) + float(item.subtotal)
+    
+    # Convert to list of objects
+    distribution = [
+        {'name': category, 'value': total}
+        for category, total in category_sales.items()
+    ]
+    
+    return sorted(distribution, key=lambda x: x['value'], reverse=True)

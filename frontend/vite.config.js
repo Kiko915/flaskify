@@ -10,4 +10,10 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    proxy: {
+      '/products': 'http://localhost:5555',
+      '/api': 'http://localhost:5555'
+    }
+  }
 })

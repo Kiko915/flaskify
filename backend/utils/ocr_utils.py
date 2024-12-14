@@ -8,23 +8,10 @@ import os
 import time
 import uuid
 
-# Initialize PaddleOCR with English support
+
 ocr = PaddleOCR(lang='en')
 
 def verify_bir_certificate(image_data):
-    """
-    Verify if an image contains valid BIR certificate content using PaddleOCR.
-    Also saves a visualization of the detected text.
-    
-    Args:
-        image_data: Bytes of the image file
-        
-    Returns:
-        tuple: (is_valid, message, viz_path)
-            is_valid (bool): True if the image appears to be a valid BIR certificate
-            message (str): Validation message or error details
-            viz_path (str): Path to the visualization image, or None if visualization failed
-    """
     try:
         # Convert image bytes to PIL Image
         image = Image.open(io.BytesIO(image_data)).convert('RGB')

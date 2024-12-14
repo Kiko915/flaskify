@@ -7,11 +7,14 @@ import { MapPin, Package, DollarSign, Star, Clock, Mail, Phone, Plus } from 'luc
 import { useAuth } from "@/utils/AuthContext";
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { Badge } from "@/components/ui/badge";
+import { Link } from 'react-router-dom';
 
 export default function ShopDetail() {
     const { shopUuid } = useParams();
     const [shop, setShop] = useState(null);
     const [products, setProducts] = useState([]);
+    const [totalProducts, setTotalProducts] = useState(0);
     const [loading, setLoading] = useState(true);
     const { user } = useAuth();
     const navigate = useNavigate();
@@ -39,28 +42,21 @@ export default function ShopDetail() {
                 const data = await response.json();
                 setShop(data.shop);
 
-                try {
-                    // Fetch products for this shop
-                    const productsResponse = await fetch(`http://localhost:5555/seller/${user.seller.seller_id}/shops/${shopUuid}/products`, {
-                        credentials: 'include',
-                        headers: {
-                            'Accept': 'application/json'
-                        }
-                    });
-
-                    if (productsResponse.ok) {
-                        const productsData = await productsResponse.json();
-                        setProducts(productsData.products || []);
-                    } else if (productsResponse.status === 404) {
-                        // If no products found, set empty array
-                        setProducts([]);
-                    } else {
-                        throw new Error('Failed to fetch products');
+                // Fetch products for this shop
+                const productsResponse = await fetch(`http://localhost:5555/seller/${user.seller.seller_id}/shops/${shopUuid}/products`, {
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json'
                     }
-                } catch (productError) {
-                    console.error('Error fetching products:', productError);
-                    toast.error('Failed to load products');
-                    setProducts([]); // Set empty array on error
+                });
+
+                if (productsResponse.ok) {
+                    const productsData = await productsResponse.json();
+                    const filteredProducts = productsData.products || [];
+                    setProducts(filteredProducts);
+                    setTotalProducts(filteredProducts.length);
+                } else {
+                    throw new Error('Failed to fetch products');
                 }
             } catch (error) {
                 console.error('Error:', error);
@@ -114,7 +110,7 @@ export default function ShopDetail() {
                                 <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
                                     <div className="flex items-center">
                                         <Package className="w-4 h-4 mr-1" />
-                                        <span>{shop.total_products} Products</span>
+                                        <span>{totalProducts} Products</span>
                                     </div>
                                     <div className="flex items-center">
                                         <Clock className="w-4 h-4 mr-1" />
@@ -153,6 +149,46 @@ export default function ShopDetail() {
                 </div>
             </Card>
 
+            {/* Shop Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+                <Card className="p-4">
+                    <div className="flex items-center gap-4">
+                        <Package className="h-8 w-8 text-primary" />
+                        <div>
+                            <p className="text-sm text-muted-foreground">Products</p>
+                            <h3 className="text-2xl font-bold">{totalProducts}</h3>
+                        </div>
+                    </div>
+                </Card>
+                <Card className="p-4">
+                    <div className="flex items-center gap-4">
+                        <DollarSign className="h-8 w-8 text-primary" />
+                        <div>
+                            <p className="text-sm text-muted-foreground">Revenue</p>
+                            <h3 className="text-2xl font-bold">₱0.00</h3>
+                        </div>
+                    </div>
+                </Card>
+                <Card className="p-4">
+                    <div className="flex items-center gap-4">
+                        <Star className="h-8 w-8 text-primary" />
+                        <div>
+                            <p className="text-sm text-muted-foreground">Rating</p>
+                            <h3 className="text-2xl font-bold">0.0</h3>
+                        </div>
+                    </div>
+                </Card>
+                <Card className="p-4">
+                    <div className="flex items-center gap-4">
+                        <Clock className="h-8 w-8 text-primary" />
+                        <div>
+                            <p className="text-sm text-muted-foreground">Response Time</p>
+                            <h3 className="text-2xl font-bold">0h</h3>
+                        </div>
+                    </div>
+                </Card>
+            </div>
+
             {/* Tabs Section */}
             <Tabs defaultValue="products" className="w-full">
                 <TabsList className="mb-8">
@@ -160,62 +196,90 @@ export default function ShopDetail() {
                     <TabsTrigger value="about">About Shop</TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="products">
-                    {products.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                            {products.map((product) => (
-                                <Card 
-                                    key={product.product_uuid} 
-                                    className="overflow-hidden hover:shadow-lg transition-shadow duration-200 cursor-pointer"
-                                    onClick={() => navigate(`/seller/seller-center/shop/${shopUuid}/products/${product.product_uuid}`)}
-                                >
-                                    <div className="aspect-square bg-gray-100 relative">
-                                        {product.main_image ? (
-                                            <img 
-                                                src={product.main_image} 
-                                                alt={product.name}
-                                                className="w-full h-full object-cover"
-                                            />
-                                        ) : (
-                                            <div className="w-full h-full flex items-center justify-center">
-                                                <Package className="w-12 h-12 text-gray-400" />
-                                            </div>
-                                        )}
+                <TabsContent value="products" className="space-y-4">
+                    
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {products.map((product) => (
+                            <Card 
+                                key={product.product_uuid} 
+                                className="overflow-hidden cursor-pointer hover:shadow-lg transition-shadow duration-200"
+                                onClick={() => navigate(`/seller/seller-center/shop/${shopUuid}/products/${product.product_uuid}`)}
+                            >
+                                <div className="aspect-square relative">
+                                    <img
+                                        src={product.main_image || '/placeholder.png'}
+                                        alt={product.name}
+                                        className="object-cover w-full h-full"
+                                    />
+                                    <div className="absolute top-2 right-2">
+                                        <Badge variant={product.status !== 'active' ? 'secondary' : 'default'} className={`${product.status !== 'active' ? 'secondary' : 'bg-green-100 text-green-800'}`}>
+                                            {product.status !== 'active' ? 'Draft' : 'Active'}
+                                        </Badge>
+                                    </div>
+                                </div>
+                                <div className="p-4">
+                                    <h3 className="font-semibold mb-2">{product.name}</h3>
+                                    <p className="text-muted-foreground text-sm mb-4">{product.description}</p>
+                                    <div className="flex justify-between items-center">
+                                        <p className="font-medium">₱{parseFloat(product.price).toFixed(2)}</p>
                                         {product.status !== 'active' && (
-                                            <div className="absolute top-2 right-2 bg-gray-800 text-white text-xs px-2 py-1 rounded">
-                                                {product.status}
-                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.stopPropagation(); // Prevent card click when clicking the button
+                                                    const publishProduct = async () => {
+                                                        try {
+                                                            const response = await fetch(
+                                                                `http://localhost:5555/seller/${user.seller.seller_id}/shops/${shopUuid}/products/${product.product_uuid}/publish`,
+                                                                {
+                                                                    method: 'POST',
+                                                                    credentials: 'include',
+                                                                }
+                                                            );
+                                                            
+                                                            if (!response.ok) {
+                                                                throw new Error('Failed to publish product');
+                                                            }
+                                                            
+                                                            // Update the product status in the local state
+                                                            setProducts(products.map(p => 
+                                                                p.product_uuid === product.product_uuid 
+                                                                    ? { ...p, status: 'active' }
+                                                                    : p
+                                                            ));
+                                                            
+                                                            toast.success('Product published successfully');
+                                                        } catch (error) {
+                                                            console.error('Error publishing product:', error);
+                                                            toast.error('Failed to publish product');
+                                                        }
+                                                    };
+                                                    publishProduct();
+                                                }}
+                                            >
+                                                Publish
+                                            </Button>
                                         )}
                                     </div>
-                                    <div className="p-4">
-                                        <h3 className="font-semibold text-sm mb-2 line-clamp-2">{product.name}</h3>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-orange-600 font-bold">${Number(product.price).toFixed(2)}</span>
-                                            <div className="flex items-center space-x-2 text-sm text-gray-500">
-                                                <span>Stock: {product.quantity}</span>
-                                                <span>•</span>
-                                                <span>Sold: {product.total_sales}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </Card>
-                            ))}
-                        </div>
-                    ) : (
-                        <Card className="p-12">
-                            <div className="text-center">
-                                <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-2">No Products Found</h3>
-                                <p className="text-gray-500 mb-6">Get started by adding your first product to your shop.</p>
-                                <Button 
-                                    onClick={() => navigate(`/seller/seller-center/shop/${shopUuid}/products/new`)}
-                                    className="bg-yellow-500 hover:bg-yellow-600 text-white"
-                                >
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add First Product
+                                </div>
+                            </Card>
+                        ))}
+                    </div>
+                    
+                    {products.length === 0 && (
+                        <div className="text-center py-12">
+                            <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                            <h3 className="text-lg font-semibold mb-2">No Products Yet</h3>
+                            <p className="text-muted-foreground mb-4">Start adding products to your shop</p>
+                            <Link to={`/seller/seller-center/shop/${shopUuid}/products/new`}>
+                                <Button>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Your First Product
                                 </Button>
-                            </div>
-                        </Card>
+                            </Link>
+                        </div>
                     )}
                 </TabsContent>
 
@@ -246,14 +310,22 @@ export default function ShopDetail() {
                             </div>
                             <div>
                                 <h3 className="font-medium mb-2">Shop Statistics</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-gray-50 p-4 rounded-lg">
                                         <p className="text-sm text-gray-500">Total Products</p>
-                                        <p className="text-xl font-semibold">{shop.total_products}</p>
+                                        <p className="text-xl font-semibold">{totalProducts}</p>
                                     </div>
                                     <div className="bg-gray-50 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-500">Total Sales</p>
-                                        <p className="text-xl font-semibold">${shop.shop_sales.toFixed(2)}</p>
+                                        <p className="text-sm text-gray-500">Active Products</p>
+                                        <p className="text-xl font-semibold">
+                                            {products.filter(p => p.status === 'active').length}
+                                        </p>
+                                    </div>
+                                    <div className="bg-gray-50 p-4 rounded-lg">
+                                        <p className="text-sm text-gray-500">Draft Products</p>
+                                        <p className="text-xl font-semibold">
+                                            {products.filter(p => p.status !== 'active').length}
+                                        </p>
                                     </div>
                                 </div>
                             </div>

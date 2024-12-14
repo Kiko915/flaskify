@@ -20,21 +20,42 @@ export default function PlainHeader() {
   };
 
   return (
-    <header className="bg-white border-b w-full sticky top-0 z-10 flex items-center justify-between py-4 px-4 md:px-8 lg:px-40">
-      <div className="flex items-end gap-2">
-        <Link to="/">
-          <img src={simplelogo} alt="flaskify logo" className="w-28 md:w-36 lg:w-40" />
-        </Link>
-        <h2 className="font-medium text-xl md:text-2xl mb-1">
-          | {pageIdentifier()}
-        </h2>
+    <div className="bg-white shadow-sm">
+      {/* Top bar */}
+      <div className="bg-[#062a51] text-white/90">
+        <div className="container mx-auto px-4 lg:px-32 py-1.5">
+          <div className="flex justify-end text-xs">
+            <Link to="/help" className="hover:text-white transition-colors flex items-center gap-1">
+              <HelpCircle size={14} />
+              <span>Need Help?</span>
+            </Link>
+          </div>
+        </div>
       </div>
-      <div>
-        <Link to="/" className="flex items-center gap-1">
-          <HelpCircle strokeWidth={1.5} />
-          <span className="hidden sm:inline">Help</span>
-        </Link>
-      </div>
-    </header>
+
+      {/* Main header */}
+      <header className="container mx-auto px-4 lg:px-32 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <Link to="/">
+              <img 
+                src={simplelogo} 
+                alt="flaskify logo" 
+                className="h-8 lg:h-10 w-auto"
+              />
+            </Link>
+            <div className="h-8 w-[1px] bg-gray-200 hidden sm:block"></div>
+            <h2 className="text-gray-800 font-medium text-xl hidden sm:block">
+              {pageIdentifier()}
+            </h2>
+          </div>
+
+          {/* Mobile page identifier */}
+          <h2 className="text-gray-800 font-medium text-lg sm:hidden">
+            {pageIdentifier()}
+          </h2>
+        </div>
+      </header>
+    </div>
   );
 }

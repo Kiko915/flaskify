@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from datetime import datetime
-from models import db, Users, Address, PaymentMethod
+from models import db, Users, Address, PaymentMethod, SellerInfo, Role
 import cloudinary.uploader
 
 
@@ -12,25 +12,46 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-@profile_bp.route('/profile', methods=['GET'])
+@profile_bp.route('/user/account', methods=['GET'])
 @login_required
 def get_profile():
     if not current_user.is_authenticated:
         return jsonify({'error': 'Not authenticated'}), 401
         
+    # Get seller info if exists
+    seller_info = None
+    if current_user.role == Role.SELLER:
+        seller = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
+        if seller:
+            seller_info = {
+                'seller_id': seller.seller_id,
+                'business_name': seller.business_name,
+                'status': seller.status
+            }
+
     return jsonify({
+        'user_uuid': current_user.user_uuid,
         'username': current_user.username,
         'email': current_user.email,
         'first_name': current_user.first_name,
         'last_name': current_user.last_name,
         'phone': current_user.phone,
         'gender': current_user.gender,
+        'country': current_user.country,
+        'province': current_user.province,
+        'city': current_user.city,
+        'complete_address': current_user.complete_address,
+        'role': current_user.role,
+        'status': current_user.status,
+        'date_joined': current_user.date_joined.isoformat() if current_user.date_joined else None,
+        'is_verified': current_user.is_verified,
         'date_of_birth': current_user.date_of_birth.strftime('%Y-%m-%d') if current_user.date_of_birth else None,
-        'profile_image': current_user.profile_image_url
+        'profile_image_url': current_user.profile_image_url,
+        'seller': seller_info
     })
 
 
-@profile_bp.route('/profile', methods=['PUT'])
+@profile_bp.route('/user/account', methods=['PUT'])
 @login_required
 def update_profile():
     if not current_user.is_authenticated:
@@ -39,32 +60,33 @@ def update_profile():
     try:
         # Handle file upload first if exists
         profile_image_url = None
-        if 'profileImage' in request.files:
+        if request.files and 'profileImage' in request.files:
             profile_image = request.files['profileImage']
             if profile_image and allowed_file(profile_image.filename):
                 try:
                     # Upload image to Cloudinary
                     upload_result = cloudinary.uploader.upload(
                         profile_image,
-                        folder="flaskify/profile-images",  # Specify your folder path here
-                        public_id=f"user_{current_user.user_uuid}",    # Optional: Set a custom public ID
-                        overwrite=True,                         # Overwrite existing image with same public_id
-                        resource_type="auto",                   # Auto-detect resource type
-                        transformation={                        # Optional: Add transformations
-                            'width': 500,                      # Resize to width
-                            'height': 500,                     # Resize to height
-                            'crop': 'fill',                    # Crop method
-                            'gravity': 'face'                  # Focus on face if present
+                        folder="flaskify/profile-images",
+                        public_id=f"user_{current_user.user_uuid}",
+                        overwrite=True,
+                        resource_type="auto",
+                        transformation={
+                            'width': 500,
+                            'height': 500,
+                            'crop': 'fill',
+                            'gravity': 'face'
                         }
                     )
                     profile_image_url = upload_result['secure_url']
                     current_user.profile_image_url = profile_image_url
                 except Exception as e:
+                    print(f"Error uploading image: {str(e)}")
                     return jsonify({'error': f'Error uploading image: {str(e)}'}), 500
 
         # Handle form data
         # Get form fields, checking both form and json data
-        data = request.form.to_dict() if request.form else request.json
+        data = request.form.to_dict() if request.form else request.get_json()
 
         if not data and not profile_image_url:
             return jsonify({'error': 'No data provided'}), 400
@@ -72,13 +94,13 @@ def update_profile():
         # Update user fields if provided
         if 'username' in data and data['username'] != current_user.username:
             existing_user = Users.query.filter_by(username=data['username']).first()
-            if existing_user:
+            if existing_user and existing_user.user_uuid != current_user.user_uuid:
                 return jsonify({'error': 'Username already exists'}), 400
             current_user.username = data['username']
             
         if 'email' in data and data['email'] != current_user.email:
             existing_email = Users.query.filter_by(email=data['email']).first()
-            if existing_email:
+            if existing_email and existing_email.user_uuid != current_user.user_uuid:
                 return jsonify({'error': 'Email already exists'}), 400
             current_user.email = data['email']
             
@@ -90,23 +112,63 @@ def update_profile():
             current_user.phone = data['phone']
         if 'gender' in data:
             current_user.gender = data['gender']
-        if 'date_of_birth' in data and data['date_of_birth']:
+        if 'dateOfBirth' in data and data['dateOfBirth']:
             try:
-                current_user.date_of_birth = datetime.strptime(data['date_of_birth'], '%Y-%m-%d').date()
+                current_user.date_of_birth = datetime.strptime(data['dateOfBirth'], '%Y-%m-%d').date()
             except ValueError:
                 return jsonify({'error': 'Invalid date format'}), 400
+        if 'country' in data:
+            current_user.country = data['country']
+        if 'province' in data:
+            current_user.province = data['province']
+        if 'city' in data:
+            current_user.city = data['city']
+        if 'completeAddress' in data:
+            current_user.complete_address = data['completeAddress']
 
         # Commit the changes
-        db.session.add(current_user)
         db.session.commit()
         
-        response_data = {'message': 'Profile updated successfully'}
-        if profile_image_url:
-            response_data['url'] = profile_image_url
+        # Get seller info if exists
+        seller_info = None
+        if current_user.role == 'Seller':
+            seller = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
+            if seller:
+                seller_info = {
+                    'seller_id': seller.seller_id,
+                    'business_name': seller.business_name,
+                    'status': seller.status
+                }
+
+        # Return updated user data
+        response_data = {
+            'message': 'Profile updated successfully',
+            'user': {
+                'user_uuid': current_user.user_uuid,
+                'username': current_user.username,
+                'email': current_user.email,
+                'first_name': current_user.first_name,
+                'last_name': current_user.last_name,
+                'phone': current_user.phone,
+                'gender': current_user.gender,
+                'country': current_user.country,
+                'province': current_user.province,
+                'city': current_user.city,
+                'complete_address': current_user.complete_address,
+                'role': current_user.role,
+                'status': current_user.status,
+                'date_joined': current_user.date_joined.isoformat() if current_user.date_joined else None,
+                'is_verified': current_user.is_verified,
+                'date_of_birth': current_user.date_of_birth.strftime('%Y-%m-%d') if current_user.date_of_birth else None,
+                'profile_image_url': current_user.profile_image_url,
+                'seller': seller_info
+            }
+        }
             
         return jsonify(response_data)
 
     except Exception as e:
+        print(f"Error updating profile: {str(e)}")
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
     
@@ -415,11 +477,10 @@ def update_address(address_uuid):
 def payment_methods():
     if request.method == 'POST':
         data = request.get_json()
-        payment_type = data['payment_type']
-        payment_details = {}
+        payment_type = data['type']
 
         # Handle different payment types
-        if payment_type == 'card':
+        if payment_type == 'credit_card':
             card_number = data['card_number']
             
             # Validate Visa or Mastercard based on starting digits
@@ -428,27 +489,32 @@ def payment_methods():
                     2221 <= int(card_number[:4]) <= 2720):
                 return jsonify({'error': 'Only Visa and Mastercard are accepted'}), 400
 
-            payment_details = {
-                'card_number': card_number,
-                'expiry_date': data['expiry_date'],
-                'card_holder_name': data['card_holder_name'],
-                'cvv': data['cvv']
-            }
+            payment_method = PaymentMethod(
+                user_uuid=current_user.user_uuid,
+                type=payment_type,
+                card_type='visa' if card_number.startswith('4') else 'mastercard',
+                last_four=card_number[-4:],
+                expiry_month=data['expiry_month'],
+                expiry_year=data['expiry_year'],
+                card_holder_name=data['card_holder_name'],
+                is_default=data.get('is_default', False)
+            )
         elif payment_type == 'paypal':
-            payment_details = {
-                'paypal_email': data['paypal_email']
-            }
+            payment_method = PaymentMethod(
+                user_uuid=current_user.user_uuid,
+                type=payment_type,
+                paypal_email=data['paypal_email'],
+                is_default=data.get('is_default', False)
+            )
         elif payment_type == 'cod':
-            payment_details = {'description': 'Cash on Delivery'}
+            payment_method = PaymentMethod(
+                user_uuid=current_user.user_uuid,
+                type=payment_type,
+                is_default=data.get('is_default', False)
+            )
         else:
             return jsonify({'error': 'Unsupported payment type'}), 400
 
-        payment_method = PaymentMethod(
-            user_uuid=current_user.user_uuid,  # Use the current user's ID
-            payment_type=payment_type,
-            payment_details=payment_details,
-            is_default=data.get('is_default', False)
-        )
         db.session.add(payment_method)
         db.session.commit()
         return jsonify(payment_method.to_dict()), 201

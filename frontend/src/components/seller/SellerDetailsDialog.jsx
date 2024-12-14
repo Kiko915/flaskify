@@ -57,7 +57,10 @@ const SellerDetailsDialog = ({ seller, isOpen, onClose }) => {
   };
 
   const handleViewDocument = async (documentUrl) => {
-    if (!documentUrl) return;
+    if (!documentUrl) {
+      console.error('No document URL provided');
+      return;
+    }
     
     try {
       // Open Cloudinary URL directly in a new tab
@@ -65,6 +68,18 @@ const SellerDetailsDialog = ({ seller, isOpen, onClose }) => {
     } catch (err) {
       console.error('Failed to view document:', err);
     }
+  };
+
+  const formatLocation = () => {
+    const parts = [];
+    
+    if (seller.business_address) parts.push(seller.business_address);
+    if (seller.business_city) parts.push(seller.business_city);
+    if (seller.business_province) parts.push(seller.business_province);
+    if (seller.business_region) parts.push(seller.business_region);
+    if (seller.business_country) parts.push(seller.business_country);
+    
+    return parts.join(', ') || 'Location not provided';
   };
 
   return (
@@ -77,7 +92,7 @@ const SellerDetailsDialog = ({ seller, isOpen, onClose }) => {
           {/* Status Section */}
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-xl font-semibold">{seller.business_name}</h2>
+              <h2 className="text-xl font-semibold">{seller.business_owner}</h2>
               <p className="text-gray-500">Application Status: {getStatusBadge(seller.status)}</p>
             </div>
             <div className="text-right">
@@ -99,64 +114,49 @@ const SellerDetailsDialog = ({ seller, isOpen, onClose }) => {
                 <div className="flex items-start gap-2">
                   <User className="h-5 w-5 text-gray-500 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Business Owner</p>
-                    <p className="font-medium">{seller.business_owner}</p>
+                    <p className="font-medium">Owner Name</p>
+                    <p className="text-gray-600">{seller.business_owner}</p>
                   </div>
                 </div>
-                <div className="flex items-start gap-2">
-                  <Mail className="h-5 w-5 text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Business Email</p>
-                    <p className="font-medium">{seller.business_email}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <Phone className="h-5 w-5 text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Business Phone</p>
-                    <p className="font-medium">{seller.business_phone || 'N/A'}</p>
-                  </div>
-                </div>
-              </div>
-              <div className="space-y-3">
                 <div className="flex items-start gap-2">
                   <Building2 className="h-5 w-5 text-gray-500 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Business Type</p>
-                    <p className="font-medium">{seller.business_type}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <FileText className="h-5 w-5 text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">Tax ID</p>
-                    <p className="font-medium">{seller.tax_id}</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-2">
-                  <FileText className="h-5 w-5 text-gray-500 mt-1" />
-                  <div>
-                    <p className="text-sm text-gray-500">BIR Certificate</p>
-                    {seller.bir_certificate ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleViewDocument(seller.bir_certificate)}
-                        className="flex items-center gap-2 px-0 font-medium"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View Document
-                      </Button>
-                    ) : (
-                      <p className="font-medium">Not available</p>
-                    )}
+                    <p className="font-medium">Business Type</p>
+                    <p className="text-gray-600">{seller.business_type}</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-2">
                   <DollarSign className="h-5 w-5 text-gray-500 mt-1" />
                   <div>
-                    <p className="text-sm text-gray-500">Total Sales</p>
-                    <p className="font-medium">₱{seller.total_sales?.toLocaleString() || '0.00'}</p>
+                    <p className="font-medium">Tax ID</p>
+                    <p className="text-gray-600">{seller.tax_id || 'Not provided'}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <Mail className="h-5 w-5 text-gray-500 mt-1" />
+                  <div>
+                    <p className="font-medium">Email</p>
+                    <p className="text-gray-600">{seller.business_email}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <Phone className="h-5 w-5 text-gray-500 mt-1" />
+                  <div>
+                    <p className="font-medium">Phone</p>
+                    <p className="text-gray-600">{seller.business_phone}</p>
+                  </div>
+                </div>
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-5 w-5 text-gray-500 mt-1" />
+                  <div>
+                    <p className="font-medium">Location</p>
+                    <p className="text-gray-600">
+                      {seller.business_address}<br />
+                      {seller.business_city}, {seller.business_province}<br />
+                      {seller.business_region}, {seller.business_country}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -165,57 +165,67 @@ const SellerDetailsDialog = ({ seller, isOpen, onClose }) => {
 
           <Separator />
 
-          {/* Address Information */}
+          {/* Documents */}
           <div>
             <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-              <MapPin className="h-5 w-5" />
-              Business Address
-            </h3>
-            <div className="space-y-2">
-              <p className="text-gray-600">
-                {seller.business_address}, {seller.business_city}
-              </p>
-              <p className="text-gray-600">
-                {seller.business_province}, {seller.business_country}
-              </p>
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Verification Details */}
-          <div>
-            <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
-              <AlertTriangle className="h-5 w-5" />
-              Verification Details
+              <FileText className="h-5 w-5" />
+              Documents
             </h3>
             <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-500">Approved By</p>
-                <p className="font-medium">{seller.approved_by || 'Pending Approval'}</p>
-              </div>
-              {seller.approval_date && (
-                <div>
-                  <p className="text-sm text-gray-500">Approval Date</p>
-                  <p className="font-medium">{formatDate(seller.approval_date)}</p>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-gray-500" />
+                  <span>BIR Certificate</span>
                 </div>
-              )}
-              {seller.violation_type && (
-                <div>
-                  <p className="text-sm text-gray-500">Violation Type</p>
-                  <Badge variant="destructive" className="mt-1">
-                    {seller.violation_type}
-                  </Badge>
-                </div>
-              )}
-              <div>
-                <p className="text-sm text-gray-500 mb-1">Admin Remarks</p>
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <p className="text-gray-700">{seller.remarks || 'No remarks available'}</p>
-                </div>
+                {seller.bir_certificate ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewDocument(seller.bir_certificate)}
+                    className="flex items-center gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    View
+                  </Button>
+                ) : (
+                  <span className="text-gray-500">Not available</span>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Additional Information */}
+          {(seller.remarks || seller.violation_type || seller.rejection_reason) && (
+            <>
+              <Separator />
+              <div>
+                <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+                  <AlertTriangle className="h-5 w-5" />
+                  Additional Information
+                </h3>
+                <div className="space-y-3">
+                  {seller.remarks && (
+                    <div>
+                      <p className="font-medium">Remarks</p>
+                      <p className="text-gray-600">{seller.remarks}</p>
+                    </div>
+                  )}
+                  {seller.violation_type && (
+                    <div>
+                      <p className="font-medium">Violation Type</p>
+                      <p className="text-gray-600">{seller.violation_type}</p>
+                    </div>
+                  )}
+                  {seller.rejection_reason && (
+                    <div>
+                      <p className="font-medium">Rejection Reason</p>
+                      <p className="text-gray-600">{seller.rejection_reason}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>

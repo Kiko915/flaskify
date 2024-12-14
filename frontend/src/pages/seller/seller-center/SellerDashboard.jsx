@@ -3,10 +3,21 @@ import NewSellerGuide from "@/components/seller/NewSellerActions";
 import { useAuth } from "@/utils/AuthContext"
 import { DollarSign, Package, ShoppingCart, Users, Lock, Unlock } from "lucide-react";
 import { useEffect, useState } from "react";
-import { createSwapy } from "swapy";
+import React from "react";
+import { Responsive, WidthProvider } from 'react-grid-layout';
+import 'react-grid-layout/css/styles.css';
+import 'react-resizable/css/styles.css';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell } from 'recharts';
+import axios from 'axios';
 
-const StatCard = ({ title, value, icon: Icon, trend, color }) => (
-  <div className="bg-white p-6 rounded-xl shadow-sm">
+// API URL
+const API_URL = 'http://localhost:5555';
+
+const ResponsiveGridLayout = WidthProvider(Responsive);
+
+const StatCard = React.memo(({ title, value, icon: Icon, trend, color }) => (
+  <div className="bg-white p-6 rounded-xl shadow-sm h-full flex flex-col">
     <div className="flex items-center justify-between mb-4">
       <div className={`p-2 rounded-lg ${color}`}>
         <Icon className="w-5 h-5 text-white" />
@@ -17,172 +28,224 @@ const StatCard = ({ title, value, icon: Icon, trend, color }) => (
         </span>
       )}
     </div>
-    <p className="text-gray-600 text-sm mb-1">{title}</p>
-    <h3 className="text-2xl font-semibold">{value}</h3>
+    <div className="flex-grow flex flex-col justify-center">
+      <p className="text-gray-600 text-sm mb-1">{title}</p>
+      <h3 className="text-2xl font-semibold">{value}</h3>
+    </div>
   </div>
-);
+));
 
 const RevenueChart = ({ data }) => (
-  <div className="bg-white p-6 rounded-xl shadow-sm">
+  <div className="bg-white p-6 rounded-xl shadow-sm h-full flex flex-col">
     <h3 className="text-lg font-medium mb-4">Revenue Overview</h3>
+    <div className="flex-grow">
+      <ResponsiveContainer width="100%" height={300}>
+        <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#6366f1" stopOpacity={0.3}/>
+              <stop offset="95%" stopColor="#6366f1" stopOpacity={0}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+          <XAxis 
+            dataKey="date" 
+            tickFormatter={(date) => {
+              const [, month, day] = date.split('-');
+              return `${month}/${day}`;
+            }}
+            stroke="#6b7280"
+            fontSize={12}
+          />
+          <YAxis 
+            tickFormatter={(value) => `₱${value.toLocaleString()}`}
+            stroke="#6b7280"
+            fontSize={12}
+          />
+          <Tooltip 
+            contentStyle={{
+              backgroundColor: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+            }}
+            formatter={(value, name) => [`₱${value.toLocaleString()}`, 'Revenue']}
+            labelFormatter={(date) => {
+              const dateObj = new Date(date);
+              return dateObj.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              });
+            }}
+          />
+          <Area 
+            type="monotone" 
+            dataKey="amount" 
+            stroke="#6366f1" 
+            strokeWidth={2}
+            fillOpacity={1} 
+            fill="url(#colorRevenue)" 
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
   </div>
 );
 
-const SalesChart = () => {
-  const data = [
-    { name: 'Products', value: 65 },
-    { name: 'Services', value: 35 }
-  ];
-  const COLORS = ['#6366F1', '#E0E7FF'];
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
-  return (
-    <div className="bg-white p-6 rounded-xl shadow-sm">
-      <h3 className="text-lg font-medium mb-4">Sales Distribution</h3>
+const SalesChart = ({ data }) => (
+  <div className="bg-white p-6 rounded-xl shadow-sm h-full flex flex-col">
+    <h3 className="text-lg font-medium mb-4">Sales Distribution</h3>
+    <div className="flex-grow flex items-center justify-center">
+      <ResponsiveContainer width="100%" height={300}>
+        <PieChart>
+          <Pie
+            data={data}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            outerRadius={100}
+            fill="#8884d8"
+            dataKey="value"
+            nameKey="name"
+            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+          >
+            {data?.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value) => `₱${value.toLocaleString()}`} />
+        </PieChart>
+      </ResponsiveContainer>
     </div>
-  );
+  </div>
+);
+
+const DraggableItem = React.memo(({ itemId, children }) => (
+  <div data-swapy-item={itemId} className="h-full">
+    {children}
+  </div>
+));
+
+const DEFAULT_LAYOUT = {
+  '1': '1',
+  '2': '2',
+  '3': '3',
+  '4': '4',
+  '5': '5',
+  '6': '6'
 };
 
 export default function SellerDashboard() {
   const { user } = useAuth();
   const [isLocked, setIsLocked] = useState(() => {
     const savedLockState = localStorage.getItem('dashboardLocked');
-    return savedLockState ? JSON.parse(savedLockState) : false;
+    return savedLockState ? JSON.parse(savedLockState) : true;
   });
-  const [swapyInstance, setSwapyInstance] = useState(null);
 
-  // Default layout configuration
-  const DEFAULT_LAYOUT = {
-    '1': '1',
-    '2': '2',
-    '3': '3',
-    '4': '4',
-    '5': '5',
-    '6': '6'
-  };
-
-  // Get saved layout or use default
-  const [layout, setLayout] = useState(() => {
-    const savedLayout = localStorage.getItem('dashboardLayout');
-    console.log('Saved layout:', savedLayout);
-    return savedLayout ? JSON.parse(savedLayout) : DEFAULT_LAYOUT;
+  const [layouts, setLayouts] = useState(() => {
+    const savedLayouts = localStorage.getItem('dashboardLayouts');
+    return savedLayouts ? JSON.parse(savedLayouts) : {
+      lg: [
+        { i: '1', x: 0, y: 0, w: 3, h: 2 },  // 0-3 columns
+        { i: '2', x: 3, y: 0, w: 3, h: 2 },  // 3-6 columns
+        { i: '3', x: 6, y: 0, w: 3, h: 2 },  // 6-9 columns
+        { i: '4', x: 9, y: 0, w: 3, h: 2 },  // 9-12 columns
+        { i: '5', x: 0, y: 2, w: 6, h: 3 },  // 0-6 columns
+        { i: '6', x: 6, y: 2, w: 6, h: 3 }   // 6-12 columns
+      ],
+      md: [
+        { i: '1', x: 0, y: 0, w: 5, h: 2 },
+        { i: '2', x: 5, y: 0, w: 5, h: 2 },
+        { i: '3', x: 0, y: 2, w: 5, h: 2 },
+        { i: '4', x: 5, y: 2, w: 5, h: 2 },
+        { i: '5', x: 0, y: 4, w: 10, h: 3 },
+        { i: '6', x: 0, y: 7, w: 10, h: 3 }
+      ],
+      sm: [
+        { i: '1', x: 0, y: 0, w: 6, h: 2 },
+        { i: '2', x: 0, y: 2, w: 6, h: 2 },
+        { i: '3', x: 0, y: 4, w: 6, h: 2 },
+        { i: '4', x: 0, y: 6, w: 6, h: 2 },
+        { i: '5', x: 0, y: 8, w: 6, h: 3 },
+        { i: '6', x: 0, y: 11, w: 6, h: 3 }
+      ]
+    };
   });
+
+  const [stats, setStats] = useState({
+    totalRevenue: 0,
+    totalOrders: 0,
+    totalProducts: 0,
+    totalCustomers: 0,
+    trends: {
+      revenue: 0,
+      orders: 0,
+      products: 0,
+      customers: 0
+    },
+    revenueData: [],
+    salesDistribution: []
+  });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
-    const container = document.querySelector('#container');
-    if (!container) {
-      console.error('Container not found');
-      return;
-    }
+    const fetchStats = async () => {
+      try {
+        setLoading(true);
+        const response = await axios.get(`${API_URL}/seller/dashboard/stats`, {
+          withCredentials: true
+        });
+        setStats(response.data);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching seller stats:', err);
+        setError(err.response?.data?.error || 'Failed to fetch dashboard stats');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const swapy = createSwapy(container, {
-      swapMode: 'hover'
-    });
-    setSwapyInstance(swapy);
+    fetchStats();
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchStats, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-    swapy.enable(!isLocked);
-
-    swapy.onSwap(({ data }) => {
-      console.log('Swap event triggered');
-      console.log('Previous layout:', layout);
-      console.log('Swap data:', data);
-      const newLayout = data.object;
-      console.log('New layout:', newLayout);
-      setLayout(newLayout);
-      localStorage.setItem('dashboardLayout', JSON.stringify(newLayout));
-    });
-
-    return () => {
-      swapy.destroy();
-    }
-  }, [isLocked]);
-
-  // Helper function to render the correct component based on item ID
-  const getItemById = (itemId) => {
-    console.log('Getting item for ID:', itemId);
-    switch (itemId) {
-      case '1':
-        return (
-          <div data-swapy-item="1">
-            <StatCard 
-              title="Total Revenue" 
-              value="$34,545" 
-              icon={DollarSign}
-              trend={12.5}
-              color="bg-indigo-500"
-            />
-          </div>
-        );
-      case '2':
-        return (
-          <div data-swapy-item="2">
-            <StatCard 
-              title="Total Orders" 
-              value="456" 
-              icon={ShoppingCart}
-              trend={8.2}
-              color="bg-blue-500"
-            />
-          </div>
-        );
-      case '3':
-        return (
-          <div data-swapy-item="3">
-            <StatCard 
-              title="Total Products" 
-              value="89" 
-              icon={Package}
-              trend={-2.4}
-              color="bg-green-500"
-            />
-          </div>
-        );
-      case '4':
-        return (
-          <div data-swapy-item="4">
-            <StatCard 
-              title="Total Customers" 
-              value="2.4k" 
-              icon={Users}
-              trend={4.7}
-              color="bg-purple-500"
-            />
-          </div>
-        );
-      case '5':
-        return (
-          <div data-swapy-item="5">
-            <RevenueChart data={revenueData} />
-          </div>
-        );
-      case '6':
-        return (
-          <div data-swapy-item="6">
-            <SalesChart />
-          </div>
-        );
-      default:
-        console.log('No matching item for ID:', itemId);
-        return null;
-    }
+  const onLayoutChange = (layout, layouts) => {
+    setLayouts(layouts);
+    localStorage.setItem('dashboardLayouts', JSON.stringify(layouts));
   };
-  
+
   const toggleLock = () => {
-    if (swapyInstance) {
-      const newLockedState = !isLocked;
-      swapyInstance.enable(!newLockedState);
-      setIsLocked(newLockedState);
-      localStorage.setItem('dashboardLocked', JSON.stringify(newLockedState));
-    }
+    const newLockedState = !isLocked;
+    setIsLocked(newLockedState);
+    localStorage.setItem('dashboardLocked', JSON.stringify(newLockedState));
   };
 
-  const revenueData = [
-    { name: 'Jan', value: 4000 },
-    { name: 'Feb', value: 3000 },
-    { name: 'Mar', value: 2000 },
-    { name: 'Apr', value: 2780 },
-    { name: 'May', value: 1890 },
-    { name: 'Jun', value: 2390 },
-  ];
+  if (loading) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center">
+        <div className="text-red-500 text-center">
+          <h3 className="text-xl font-semibold mb-2">Error Loading Dashboard</h3>
+          <p>{error}</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-full overflow-x-hidden min-h-screen rounded">
@@ -205,35 +268,72 @@ export default function SellerDashboard() {
           )}
         </button>
         <div className="relative mb-4">
-          <GreetingTab username={user ? user.first_name : 'loading...'} role={user ? user.role : 'loading...'} />
+          <GreetingTab username={user?.first_name} role={user?.role} />
         </div>
-        <div id="container">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6 motion-preset-slide-up-md">
-            <section data-swapy-slot="1">
-              {getItemById(layout['1'])}
-            </section>
-            <section data-swapy-slot="2">
-              {getItemById(layout['2'])}
-            </section>
-            <section data-swapy-slot="3">
-              {getItemById(layout['3'])}
-            </section>
-            <section data-swapy-slot="4">
-              {getItemById(layout['4'])}
-            </section>
+        <ResponsiveGridLayout
+          className="layout"
+          layouts={layouts}
+          onLayoutChange={onLayoutChange}
+          isDraggable={!isLocked}
+          isResizable={!isLocked}
+          breakpoints={{ lg: 1200, md: 996, sm: 768 }}
+          cols={{ lg: 12, md: 10, sm: 6 }}
+          rowHeight={100}
+          margin={[16, 16]}
+          preventCollision={true}
+          compactType={null}
+        >
+          <div key="1" className="h-full">
+            <StatCard 
+              title="Total Revenue" 
+              value={`₱${stats.totalRevenue.toLocaleString()}`}
+              icon={DollarSign}
+              trend={stats.trends.revenue}
+              color="bg-indigo-500"
+            />
+          </div>
+          
+          <div key="2" className="h-full">
+            <StatCard 
+              title="Total Orders" 
+              value={stats.totalOrders.toLocaleString()}
+              icon={ShoppingCart}
+              trend={stats.trends.orders}
+              color="bg-blue-500"
+            />
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6 motion-preset-slide-up-lg">
-            <div className="lg:col-span-2" data-swapy-slot="5">
-              {getItemById(layout['5'])}
-            </div>
-            <div data-swapy-slot="6">
-              {getItemById(layout['6'])}
-            </div>
+          <div key="3" className="h-full">
+            <StatCard 
+              title="Total Products" 
+              value={stats.totalProducts.toLocaleString()}
+              icon={Package}
+              trend={stats.trends.products}
+              color="bg-green-500"
+            />
           </div>
-          <div className="my-6 motion-preset-slide-up-lg">
-            <NewSellerGuide />
+
+          <div key="4" className="h-full">
+            <StatCard 
+              title="Total Customers" 
+              value={stats.totalCustomers.toLocaleString()}
+              icon={Users}
+              trend={stats.trends.customers}
+              color="bg-purple-500"
+            />
           </div>
+
+          <div key="5" className="h-full">
+            <RevenueChart data={stats.revenueData} />
+          </div>
+
+          <div key="6" className="h-full">
+            <SalesChart data={stats.salesDistribution} />
+          </div>
+        </ResponsiveGridLayout>
+
+        <div className="my-6 motion-preset-slide-up-lg">
+          <NewSellerGuide />
         </div>
       </div>
     </div>

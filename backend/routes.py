@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from models import db, mail, Users, SellerInfo, Role, Shop
+from models import db, mail, Users, SellerInfo, Role, Shop, Product
 from flask_mail import Message
 import random
 import string
@@ -224,4 +224,79 @@ def get_sellers():
             })
         return jsonify(sellers_data)
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# Shop Routes
+@main.route('/api/shops/<shop_uuid>', methods=['GET'])
+def get_shop_details(shop_uuid):
+    try:
+        shop = Shop.query.get_or_404(shop_uuid)
+        seller = SellerInfo.query.get(shop.seller_id)
+        
+        # Get shop metrics
+        total_products = Product.query.filter_by(shop_uuid=shop_uuid, status='active').count()
+        
+        return jsonify({
+            'shop_uuid': shop.shop_uuid,
+            'seller_id': shop.seller_id,
+            'seller_user_id': seller.user_id if seller else None,
+            'business_name': shop.business_name,
+            'business_country': shop.business_country,
+            'business_province': shop.business_province,
+            'business_city': shop.business_city,
+            'business_address': shop.business_address,
+            'shop_logo': shop.shop_logo,
+            'total_products': total_products,
+            'shop_sales': float(shop.shop_sales) if shop.shop_sales else 0.00,
+            'date_created': shop.date_created.isoformat() if shop.date_created else None,
+            'last_updated': shop.last_updated.isoformat() if shop.last_updated else None,
+            'is_archived': shop.is_archived
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@main.route('/api/shops/<shop_uuid>/products', methods=['GET'])
+def get_shop_products(shop_uuid):
+    try:
+        # Get query parameters for filtering and sorting
+        sort_by = request.args.get('sort', 'newest')  # Default sort by newest
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        # Base query for active products
+        query = Product.query.filter_by(
+            shop_uuid=shop_uuid,
+            status='active',
+            visibility=True
+        )
+        
+        # Apply sorting
+        if sort_by == 'popular':
+            query = query.order_by(Product.total_sales.desc())
+        elif sort_by == 'price-low':
+            query = query.order_by(Product.price.asc())
+        elif sort_by == 'price-high':
+            query = query.order_by(Product.price.desc())
+        else:  # newest
+            query = query.order_by(Product.created_at.desc())
+            
+        # Paginate results
+        products = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Convert products to dictionary format
+        products_data = []
+        for product in products.items:
+            product_dict = product.to_dict()
+            # Add any additional shop-specific data if needed
+            products_data.append(product_dict)
+        
+        return jsonify({
+            'products': products_data,
+            'total': products.total,
+            'pages': products.pages,
+            'current_page': page,
+            'per_page': per_page
+        })
+    except Exception as e:
+        print(f"Error in get_shop_products: {str(e)}")  # Add debug logging
         return jsonify({'error': str(e)}), 500

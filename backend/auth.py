@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from models import db, mail, OTP, Users, SellerInfo
+from models import db, mail, OTP, Users, SellerInfo, Role
 from flask_mail import Message
 import random
 import string
@@ -83,7 +83,7 @@ def signup():
         country=data.get('country'),
         province=data.get('province'),
         city=data.get('city'),
-        role='Buyer',
+        role=Role.BUYER,
         is_verified=True,
         password_hash=generate_password_hash(data.get('password'), method='pbkdf2')  # Set verification status
     )
@@ -101,8 +101,11 @@ def signup():
 
 
 # Login
-@auth.route('/login', methods=['POST'])
+@auth.route('/login', methods=['GET', 'POST'])
 def login():
+    if request.method == 'GET':
+        return jsonify({'message': 'Please login with your credentials'}), 200
+        
     data = request.json
     email = data.get('email')
     password = data.get('password')
@@ -123,7 +126,7 @@ def login():
 
 
 # Logout
-@auth.route('/logout')
+@auth.route('/logout', methods=['POST'])
 @login_required
 def logout():
     logout_user()  # Logs out the user and clears session
@@ -249,7 +252,7 @@ def get_current_user():
     }
 
     # Add seller information if user is a seller
-    if current_user.role == 'Seller':
+    if current_user.role == Role.SELLER:
         seller_info = SellerInfo.query.filter_by(user_id=current_user.user_uuid).first()
         if seller_info:
             user_data['seller'] = {

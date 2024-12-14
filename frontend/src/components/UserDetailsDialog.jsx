@@ -82,7 +82,7 @@ export default function UserDetailsDialog({
         }
     };
 
-    const canEditUser = currentUserRole === 'Admin' && (!user || user.role !== 'Admin' || user.id === userId);
+    const canEditUser = currentUserRole === 'ADMIN' && (!user || user.role !== 'ADMIN' || user.id === userId);
 
     if (!user) return null;
 
@@ -159,9 +159,9 @@ export default function UserDetailsDialog({
                                 <SelectValue placeholder="Select role" />
                             </SelectTrigger>
                             <SelectContent>
-                                <SelectItem value="Admin">Admin</SelectItem>
-                                <SelectItem value="Seller">Seller</SelectItem>
-                                <SelectItem value="Buyer">Buyer</SelectItem>
+                                <SelectItem value="ADMIN">Admin</SelectItem>
+                                <SelectItem value="SELLER">Seller</SelectItem>
+                                <SelectItem value="BUYER">Buyer</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

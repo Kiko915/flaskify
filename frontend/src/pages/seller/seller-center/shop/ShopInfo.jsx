@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Store, Plus, Settings, Package, DollarSign, MapPin, Archive } from 'lucide-react';
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from "@/utils/AuthContext";
 import toast from 'react-hot-toast';
 import {
@@ -21,6 +21,7 @@ export default function ShopInfo() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [archiveDialog, setArchiveDialog] = useState({
         isOpen: false,
         shopUuid: null,
@@ -94,19 +95,23 @@ export default function ShopInfo() {
     };
 
     useEffect(() => {
-        console.log('Current user:', user); // Debug log for user object
+        if (!user) {
+            return;
+        }
+
+        if (!user.seller) {
+            navigate('/seller/register');
+            return;
+        }
+
+        if (user.seller.status !== 'Approved') {
+            setLoading(false);
+            return;
+        }
 
         const fetchShops = async () => {
-            if (!user?.seller?.seller_id || user?.seller?.status !== 'Approved') {
-                console.log('No seller_id found or seller not approved'); // Debug log
-                setLoading(false);
-                return;
-            }
-
-            console.log('Attempting to fetch shops for seller_id:', user.seller.seller_id); // Debug log
-
             try {
-                const response = await fetch(`http://localhost:5555/seller/${user.seller.seller_id}/shops`, {
+                const response = await fetch(`http://localhost:5555/seller/${user.seller.seller_id}/shops?per_page=100`, {
                     method: 'GET',
                     headers: {
                         'Content-Type': 'application/json',
@@ -114,27 +119,53 @@ export default function ShopInfo() {
                     credentials: 'include'
                 });
 
-                console.log('Response status:', response.status); // Debug log
-
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => null);
-                    console.error('Error response:', errorData); // Debug log
                     throw new Error(errorData?.error || 'Failed to fetch shops');
                 }
 
                 const data = await response.json();
-                console.log('Fetched shops data:', data); // Debug log
-                setShops(data.shops || []);
-                setLoading(false);
+                console.log('Shops response:', data); // Debug log
+                
+                // Check if data has the expected structure
+                if (!data || !data.shops) {
+                    throw new Error('Invalid response format');
+                }
+                
+                // Fetch product counts for each shop
+                const shopsWithProducts = await Promise.all(data.shops.map(async (shop) => {
+                    try {
+                        const productResponse = await fetch(`http://localhost:5555/seller/${user.seller.seller_id}/shops/${shop.shop_uuid}/products/count`, {
+                            method: 'GET',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            credentials: 'include'
+                        });
+                        
+                        if (productResponse.ok) {
+                            const productData = await productResponse.json();
+                            return { ...shop, total_products: productData.count };
+                        }
+                        return shop;
+                    } catch (error) {
+                        console.error(`Error fetching product count for shop ${shop.shop_uuid}:`, error);
+                        return shop;
+                    }
+                }));
+                
+                setShops(shopsWithProducts || []);
             } catch (err) {
                 console.error('Error fetching shops:', err); // Debug log
                 setError(err.message);
+                toast.error('Failed to load shops');
+            } finally {
                 setLoading(false);
             }
         };
 
         fetchShops();
-    }, [user]);
+    }, [user, navigate]);
 
     // Debug render log
     console.log('Render state:', { loading, error, shopsCount: shops?.length });
@@ -286,16 +317,16 @@ export default function ShopInfo() {
                             </div>
                             <Separator className="my-4" />
                             <div className="grid grid-cols-2 gap-4 mt-2">
-                                <Link to={`/seller/seller-center/shop/edit/${shop.shop_uuid}`}>
+                                <Link to={`/seller/seller-center/shop/${shop.shop_uuid}/edit`}>
                                     <Button variant="outline" className="w-full">
                                         <Settings className="w-4 h-4 mr-2" />
                                         Edit Shop
                                     </Button>
                                 </Link>
-                                <Link to={`/seller/seller-center/shop/${shop.shop_uuid}/products`}>
-                                    <Button variant="outline" className="w-full">
+                                <Link to={`/seller/seller-center/shop/${shop.shop_uuid}/detail`}>
+                                    <Button variant="outline" className="w-full" disabled={shop.is_archived}>
                                         <Package className="w-4 h-4 mr-2" />
-                                        Products
+                                        Products ({shop.total_products})
                                     </Button>
                                 </Link>
                                 <Link to={`/seller/seller-center/shop/${shop.shop_uuid}/detail`}>

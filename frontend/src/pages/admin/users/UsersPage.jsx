@@ -175,9 +175,9 @@ export default function UsersPage() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All Roles</SelectItem>
-                            <SelectItem value="Admin">Admin</SelectItem>
-                            <SelectItem value="Seller">Seller</SelectItem>
-                            <SelectItem value="Buyer">Buyer</SelectItem>
+                            <SelectItem value="ADMIN">Admin</SelectItem>
+                            <SelectItem value="SELLER">Seller</SelectItem>
+                            <SelectItem value="BUYER">Buyer</SelectItem>
                         </SelectContent>
                     </Select>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -267,7 +267,7 @@ export default function UsersPage() {
                                                 >
                                                     View Details
                                                 </DropdownMenuItem>
-                                                {currentUserRole === 'Admin' && user.role !== 'Admin' && (
+                                                {currentUserRole === 'ADMIN' && user.role !== 'ADMIN' && (
                                                     <>
                                                         {user.status !== 'suspended' ? (
                                                             <DropdownMenuItem

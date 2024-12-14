@@ -55,13 +55,35 @@ export default function Dashboard() {
             const response = await fetch('http://localhost:5555/admin/dashboard/stats', {
                 credentials: 'include'
             });
+            
+            if (!response.ok) {
+                throw new Error(`Failed to fetch stats: ${response.statusText}`);
+            }
+            
             const data = await response.json();
-            setStats(data);
+            setStats({
+                totalUsers: data.buyers + data.sellers,
+                buyers: data.buyers,
+                sellers: data.sellers,
+                approvedSellers: data.approvedSellers,
+                pendingSellers: data.pendingSellers,
+                totalProducts: data.totalProducts,
+                totalRevenue: data.totalRevenue,
+                totalOrders: data.totalOrders,
+                pendingOrders: data.pendingOrders,
+                activeShops: data.activeShops,
+                pendingShops: data.pendingShops
+            });
 
             // Fetch sales data for charts
             const salesResponse = await fetch('http://localhost:5555/admin/dashboard/sales', {
                 credentials: 'include'
             });
+            
+            if (!salesResponse.ok) {
+                throw new Error(`Failed to fetch sales data: ${salesResponse.statusText}`);
+            }
+            
             const salesData = await salesResponse.json();
             setSalesData(salesData);
             
@@ -91,7 +113,7 @@ export default function Dashboard() {
         {
             title: "Total Users",
             subtitle: "Buyers & Sellers",
-            value: stats.buyers + stats.sellers,
+            value: stats.totalUsers,
             icon: Users,
             color: "text-blue-600",
             bgColor: "bg-blue-100"

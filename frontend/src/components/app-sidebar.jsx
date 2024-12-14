@@ -9,6 +9,9 @@ import {
   ShoppingBag,
   SquareTerminal,
   UserRound,
+  Truck,
+  MessageSquare,
+  ImageIcon,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -61,8 +64,8 @@ export function AppSidebar({
             url: "/admin/products",
           },
           {
-            title: "Product Categories",
-            url: "/admin/products/categories",
+            title: "Categories",
+            url: "/admin/categories",
           },
           {
             title: "Product Reviews",
@@ -136,6 +139,36 @@ export function AppSidebar({
         ],
       },
       {
+        title: "Communications",
+        url: "#",
+        icon: MessageSquare,
+        items: [
+          {
+            title: "Contact Messages",
+            url: "/admin/contacts",
+          },
+          {
+            title: "Newsletter",
+            url: "/admin/newsletter",
+          }
+        ],
+      },
+      {
+        title: "Shipping",
+        url: "#",
+        icon: Truck,
+        items: [
+          {
+            title: "Shipping Providers",
+            url: "/admin/shipping-providers",
+          },
+          {
+            title: "Shipping Rates",
+            url: "/admin/shipping-rates",
+          }
+        ],
+      },
+      {
         title: "Settings",
         url: "#",
         icon: Settings2,
@@ -151,6 +184,17 @@ export function AppSidebar({
           {
             title: "Security Settings",
             url: "/admin/settings/security",
+          }
+        ],
+      },
+      {
+        title: "Content Management",
+        url: "#",
+        icon: ImageIcon,
+        items: [
+          {
+            title: "Banners",
+            url: "/admin/banners",
           }
         ],
       },
